@@ -1,0 +1,20 @@
+db/
+incremental_db/
+simulation/
+output_files/
+*.jdi
+*.rpt
+*.summary
+*.smsg
+*.pin
+*.sof
+*.pof
+*.jam
+*.jbc
+*.vcd
+*.vvp
+*.bak
+*.log
+*.done
+*.qws
+2026数字课程设计 - verilog讲座-修订版.pdf
