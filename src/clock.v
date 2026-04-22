@@ -288,15 +288,17 @@ module clock(
                 end
             end else begin
                 alarm_tone <= 1'b0;
+            end
 
-                if (qd_rise) begin
-                    run_enable <= ~run_enable;
-                end
+            if (!alarm_active && qd_rise) begin
+                run_enable <= ~run_enable;
+            end
 
+            if (!alarm_active) begin
                 if (run_enable) begin
                     if (cp3_rise) begin
                         digits <= next_time_digits;
-                        if (alarm_match(next_time_digits, alarm_digits)) begin
+                        if (alarm_enable && alarm_match(next_time_digits, alarm_digits)) begin
                             alarm_active <= 1'b1;
                         end
                     end

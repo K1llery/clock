@@ -120,7 +120,8 @@ module tb_clock;
         begin
             wait_sync;
             if (dut.digits !== expected) begin
-                $display("FAIL %0s expected=%h got=%h", label, expected, dut.digits);
+                $display("FAIL %0s expected=%h got=%h run=%b alarm_en=%b alarm_active=%b cp3_sync=%b",
+                    label, expected, dut.digits, dut.run_enable, dut.alarm_enable, dut.alarm_active, dut.cp3_sync);
                 $finish;
             end
         end
