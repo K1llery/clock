@@ -8,6 +8,8 @@ module clock(
     input  wire pulse,
     input  wire k0,
     input  wire k1,
+    input  wire k2,
+    input  wire k3,
     output wire lg1_d0,
     output wire lg1_d1,
     output wire lg1_d2,
@@ -39,29 +41,40 @@ module clock(
 );
 
     reg        run_enable;
+    reg        alarm_active;
+    reg        alarm_tone;
     reg [23:0] digits;
+    reg [15:0] alarm_digits;
 
     reg [2:0] cp3_sync;
     reg [2:0] qd_sync;
     reg [2:0] pulse_sync;
     reg [1:0] k0_sync;
     reg [1:0] k1_sync;
+    reg [1:0] k2_sync;
+    reg [1:0] k3_sync;
 
-    wire [3:0] sec_ones = digits[3:0];
-    wire [3:0] sec_tens = digits[7:4];
-    wire [3:0] min_ones = digits[11:8];
-    wire [3:0] min_tens = digits[15:12];
-    wire [3:0] hour_ones = digits[19:16];
-    wire [3:0] hour_tens = digits[23:20];
+    wire show_alarm = k2_sync[1];
+    wire alarm_enable = k3_sync[1];
+    wire [23:0] shown_digits = show_alarm ? {alarm_digits, 8'h00} : digits;
+
+    wire [3:0] sec_ones  = shown_digits[3:0];
+    wire [3:0] sec_tens  = shown_digits[7:4];
+    wire [3:0] min_ones  = shown_digits[11:8];
+    wire [3:0] min_tens  = shown_digits[15:12];
+    wire [3:0] hour_ones = shown_digits[19:16];
+    wire [3:0] hour_tens = shown_digits[23:20];
 
     wire [6:0] lg1_segments = seg7_cc(sec_ones);
+    wire [23:0] next_time_digits = inc_second(digits);
 
-    wire cp3_rise   = (cp3_sync[2:1]   == 2'b01);
-    wire qd_rise    = (qd_sync[2:1]    == 2'b01);
+    wire cp3_rise = (cp3_sync[2:1] == 2'b01);
+    wire qd_rise = (qd_sync[2:1] == 2'b01);
     wire pulse_rise = (pulse_sync[2:1] == 2'b01);
 
     wire k0_level = k0_sync[1];
     wire k1_level = k1_sync[1];
+    wire speaker_out = alarm_active ? alarm_tone : 1'b0;
 
     function [7:0] inc_hour_pair;
         input [7:0] current;
@@ -89,21 +102,52 @@ module clock(
         end
     endfunction
 
-    function [23:0] inc_hour;
-        input [23:0] current;
+    function [15:0] inc_alarm_hour;
+        input [15:0] current;
+        reg [7:0] next_hour;
+        begin
+            next_hour = inc_hour_pair(current[15:8]);
+            inc_alarm_hour = {next_hour, current[7:0]};
+        end
+    endfunction
+
+    function [15:0] inc_alarm_minute;
+        input [15:0] current;
         reg [3:0] h_tens;
         reg [3:0] h_ones;
         reg [3:0] m_tens;
         reg [3:0] m_ones;
         reg [7:0] next_hour;
         begin
-            h_tens = current[23:20];
-            h_ones = current[19:16];
-            m_tens = current[15:12];
-            m_ones = current[11:8];
-            next_hour = inc_hour_pair({h_tens, h_ones});
+            h_tens = current[15:12];
+            h_ones = current[11:8];
+            m_tens = current[7:4];
+            m_ones = current[3:0];
+            next_hour = 8'h00;
 
-            inc_hour = {next_hour[7:4], next_hour[3:0], m_tens, m_ones, 4'd0, 4'd0};
+            if ((m_tens == 4'd5) && (m_ones == 4'd9)) begin
+                m_tens = 4'd0;
+                m_ones = 4'd0;
+                next_hour = inc_hour_pair({h_tens, h_ones});
+                h_tens = next_hour[7:4];
+                h_ones = next_hour[3:0];
+            end else if (m_ones == 4'd9) begin
+                m_ones = 4'd0;
+                m_tens = m_tens + 4'd1;
+            end else begin
+                m_ones = m_ones + 4'd1;
+            end
+
+            inc_alarm_minute = {h_tens, h_ones, m_tens, m_ones};
+        end
+    endfunction
+
+    function [23:0] inc_hour;
+        input [23:0] current;
+        reg [7:0] next_hour;
+        begin
+            next_hour = inc_hour_pair(current[23:16]);
+            inc_hour = {next_hour, current[15:8], 8'h00};
         end
     endfunction
 
@@ -134,7 +178,7 @@ module clock(
                 m_ones = m_ones + 4'd1;
             end
 
-            inc_minute = {h_tens, h_ones, m_tens, m_ones, 4'd0, 4'd0};
+            inc_minute = {h_tens, h_ones, m_tens, m_ones, 8'h00};
         end
     endfunction
 
@@ -183,6 +227,14 @@ module clock(
         end
     endfunction
 
+    function alarm_match;
+        input [23:0] current_time;
+        input [15:0] current_alarm;
+        begin
+            alarm_match = (current_time[23:8] == current_alarm) && (current_time[7:0] == 8'h00);
+        end
+    endfunction
+
     function [6:0] seg7_cc;
         input [3:0] bcd;
         begin
@@ -205,32 +257,61 @@ module clock(
     always @(negedge clr_n or posedge cp2) begin
         if (!clr_n) begin
             run_enable <= 1'b1;
+            alarm_active <= 1'b0;
+            alarm_tone <= 1'b0;
             digits <= 24'h000000;
+            alarm_digits <= 16'h0000;
             cp3_sync <= 3'b000;
             qd_sync <= 3'b000;
             pulse_sync <= 3'b000;
             k0_sync <= 2'b00;
             k1_sync <= 2'b00;
+            k2_sync <= 2'b00;
+            k3_sync <= 2'b00;
         end else begin
             cp3_sync <= {cp3_sync[1:0], cp3};
             qd_sync <= {qd_sync[1:0], qd};
             pulse_sync <= {pulse_sync[1:0], pulse};
             k0_sync <= {k0_sync[0], k0};
             k1_sync <= {k1_sync[0], k1};
+            k2_sync <= {k2_sync[0], k2};
+            k3_sync <= {k3_sync[0], k3};
 
-            if (qd_rise) begin
-                run_enable <= ~run_enable;
-            end
-
-            if (run_enable) begin
-                if (cp3_rise) begin
-                    digits <= inc_second(digits);
+            if (!alarm_enable) begin
+                alarm_active <= 1'b0;
+                alarm_tone <= 1'b0;
+            end else if (alarm_active) begin
+                alarm_tone <= ~alarm_tone;
+                if (qd_rise) begin
+                    alarm_active <= 1'b0;
+                    alarm_tone <= 1'b0;
                 end
-            end else if (pulse_rise) begin
-                if (k0_level) begin
-                    digits <= inc_hour(digits);
-                end else if (k1_level) begin
-                    digits <= inc_minute(digits);
+            end else begin
+                alarm_tone <= 1'b0;
+
+                if (qd_rise) begin
+                    run_enable <= ~run_enable;
+                end
+
+                if (run_enable) begin
+                    if (cp3_rise) begin
+                        digits <= next_time_digits;
+                        if (alarm_match(next_time_digits, alarm_digits)) begin
+                            alarm_active <= 1'b1;
+                        end
+                    end
+                end else if (pulse_rise) begin
+                    if (show_alarm) begin
+                        if (k0_level) begin
+                            alarm_digits <= inc_alarm_hour(alarm_digits);
+                        end else if (k1_level) begin
+                            alarm_digits <= inc_alarm_minute(alarm_digits);
+                        end
+                    end else if (k0_level) begin
+                        digits <= inc_hour(digits);
+                    end else if (k1_level) begin
+                        digits <= inc_minute(digits);
+                    end
                 end
             end
         end
@@ -243,7 +324,7 @@ module clock(
     assign lg1_d4 = lg1_segments[4];
     assign lg1_d5 = lg1_segments[5];
     assign lg1_d6 = lg1_segments[6];
-    assign lg1_d7 = 1'b0;
+    assign lg1_d7 = speaker_out;
 
     assign lg2_a = sec_tens[0];
     assign lg2_b = sec_tens[1];

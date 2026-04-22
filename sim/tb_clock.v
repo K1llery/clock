@@ -9,6 +9,8 @@ module tb_clock;
     reg pulse;
     reg k0;
     reg k1;
+    reg k2;
+    reg k3;
 
     wire lg1_d0;
     wire lg1_d1;
@@ -38,6 +40,7 @@ module tb_clock;
     wire lg6_b;
     wire lg6_c;
     wire lg6_d;
+    reg  speaker_sample;
 
     clock dut (
         .cp2(cp2),
@@ -47,6 +50,8 @@ module tb_clock;
         .pulse(pulse),
         .k0(k0),
         .k1(k1),
+        .k2(k2),
+        .k3(k3),
         .lg1_d0(lg1_d0),
         .lg1_d1(lg1_d1),
         .lg1_d2(lg1_d2),
@@ -103,13 +108,31 @@ module tb_clock;
         end
     endtask
 
+    task wait_sync;
+        begin
+            #30;
+        end
+    endtask
+
     task check_digits;
         input [23:0] expected;
         input [255:0] label;
         begin
-            #12;
+            wait_sync;
             if (dut.digits !== expected) begin
                 $display("FAIL %0s expected=%h got=%h", label, expected, dut.digits);
+                $finish;
+            end
+        end
+    endtask
+
+    task check_alarm_digits;
+        input [15:0] expected;
+        input [255:0] label;
+        begin
+            wait_sync;
+            if (dut.alarm_digits !== expected) begin
+                $display("FAIL %0s expected=%h got=%h", label, expected, dut.alarm_digits);
                 $finish;
             end
         end
@@ -140,14 +163,21 @@ module tb_clock;
         pulse = 1'b0;
         k0 = 1'b0;
         k1 = 1'b0;
+        k2 = 1'b0;
+        k3 = 1'b0;
 
         #2 clr_n = 1'b0;
         #8 clr_n = 1'b1;
-        #20;
+        wait_sync;
 
         check_digits(24'h000000, "reset");
+        check_alarm_digits(16'h0000, "alarm reset");
         if (dut.run_enable !== 1'b1) begin
             $display("FAIL run_enable should default to running");
+            $finish;
+        end
+        if (dut.alarm_active !== 1'b0) begin
+            $display("FAIL alarm_active should default low");
             $finish;
         end
 
@@ -162,7 +192,7 @@ module tb_clock;
         check_bcd_bus(4'd0, lg2_a, lg2_b, lg2_c, lg2_d, "sec tens");
 
         qd_pulse;
-        #12;
+        wait_sync;
         if (dut.run_enable !== 1'b0) begin
             $display("FAIL qd should pause the clock");
             $finish;
@@ -183,14 +213,91 @@ module tb_clock;
         check_bcd_bus(4'd1, lg5_a, lg5_b, lg5_c, lg5_d, "hour ones");
         k0 = 1'b0;
 
-        dut.digits = 24'h235958;
+        k2 = 1'b1;
+        wait_sync;
+        check_bcd_bus(4'd0, lg6_a, lg6_b, lg6_c, lg6_d, "alarm hour tens display");
+        check_bcd_bus(4'd0, lg5_a, lg5_b, lg5_c, lg5_d, "alarm hour ones display");
+
+        k0 = 1'b1;
+        pulse_btn;
+        k0 = 1'b0;
+        k1 = 1'b1;
+        pulse_btn;
+        pulse_btn;
+        k1 = 1'b0;
+        check_alarm_digits(16'h0102, "alarm setting");
+        check_bcd_bus(4'd1, lg5_a, lg5_b, lg5_c, lg5_d, "alarm display hour ones");
+        check_bcd_bus(4'd2, lg3_a, lg3_b, lg3_c, lg3_d, "alarm display minute ones");
+        if (dut.lg1_segments !== 7'b0111111) begin
+            $display("FAIL alarm display should force seconds to 00");
+            $finish;
+        end
+
+        k3 = 1'b1;
+        wait_sync;
+
+        k2 = 1'b0;
+        wait_sync;
+        dut.digits = 24'h010158;
+        wait_sync;
         qd_pulse;
-        #12;
+        wait_sync;
         if (dut.run_enable !== 1'b1) begin
             $display("FAIL qd should resume the clock");
             $finish;
         end
 
+        cp3_tick;
+        check_digits(24'h010159, "alarm pre-trigger second");
+        if (dut.alarm_active !== 1'b0) begin
+            $display("FAIL alarm should not trigger early");
+            $finish;
+        end
+
+        cp3_tick;
+        check_digits(24'h010200, "alarm trigger time");
+        wait_sync;
+        if (dut.alarm_active !== 1'b1) begin
+            $display("FAIL alarm should trigger at HH:MM:00");
+            $finish;
+        end
+
+        speaker_sample = lg1_d7;
+        #15;
+        if (lg1_d7 === speaker_sample) begin
+            $display("FAIL speaker output should toggle while alarm is active");
+            $finish;
+        end
+
+        qd_pulse;
+        wait_sync;
+        if (dut.alarm_active !== 1'b0) begin
+            $display("FAIL qd should dismiss the alarm");
+            $finish;
+        end
+        if (dut.run_enable !== 1'b1) begin
+            $display("FAIL qd dismiss should not pause the running clock");
+            $finish;
+        end
+
+        dut.digits = 24'h010159;
+        wait_sync;
+        cp3_tick;
+        wait_sync;
+        if (dut.alarm_active !== 1'b1) begin
+            $display("FAIL alarm should retrigger on next matching time");
+            $finish;
+        end
+
+        k3 = 1'b0;
+        wait_sync;
+        if (dut.alarm_active !== 1'b0) begin
+            $display("FAIL disabling alarm should stop the speaker");
+            $finish;
+        end
+
+        dut.digits = 24'h235958;
+        wait_sync;
         cp3_tick;
         check_digits(24'h235959, "rollover pre-state");
         cp3_tick;

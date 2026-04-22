@@ -55,6 +55,8 @@ set_location_assignment PIN_60 -to qd
 set_location_assignment PIN_61 -to pulse
 set_location_assignment PIN_54 -to k0
 set_location_assignment PIN_81 -to k1
+set_location_assignment PIN_80 -to k2
+set_location_assignment PIN_79 -to k3
 
 set_location_assignment PIN_44 -to lg1_d0
 set_location_assignment PIN_45 -to lg1_d1
