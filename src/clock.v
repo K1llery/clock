@@ -290,30 +290,33 @@ module clock(
                 alarm_tone <= 1'b0;
             end
 
-            if (!alarm_active && qd_rise) begin
-                run_enable <= ~run_enable;
+            if (qd_rise) begin
+                if (alarm_active) begin
+                    alarm_active <= 1'b0;
+                    alarm_tone <= 1'b0;
+                end else begin
+                    run_enable <= ~run_enable;
+                end
             end
 
-            if (!alarm_active) begin
-                if (run_enable) begin
-                    if (cp3_rise) begin
-                        digits <= next_time_digits;
-                        if (alarm_enable && alarm_match(next_time_digits, alarm_digits)) begin
-                            alarm_active <= 1'b1;
-                        end
+            if (run_enable) begin
+                if (cp3_rise) begin
+                    digits <= next_time_digits;
+                    if (alarm_enable && !alarm_active && alarm_match(next_time_digits, alarm_digits)) begin
+                        alarm_active <= 1'b1;
                     end
-                end else if (pulse_rise) begin
-                    if (show_alarm) begin
-                        if (k0_level) begin
-                            alarm_digits <= inc_alarm_hour(alarm_digits);
-                        end else if (k1_level) begin
-                            alarm_digits <= inc_alarm_minute(alarm_digits);
-                        end
-                    end else if (k0_level) begin
-                        digits <= inc_hour(digits);
+                end
+            end else if (!alarm_active && pulse_rise) begin
+                if (show_alarm) begin
+                    if (k0_level) begin
+                        alarm_digits <= inc_alarm_hour(alarm_digits);
                     end else if (k1_level) begin
-                        digits <= inc_minute(digits);
+                        alarm_digits <= inc_alarm_minute(alarm_digits);
                     end
+                end else if (k0_level) begin
+                    digits <= inc_hour(digits);
+                end else if (k1_level) begin
+                    digits <= inc_minute(digits);
                 end
             end
         end

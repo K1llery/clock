@@ -263,6 +263,13 @@ module tb_clock;
             $finish;
         end
 
+        cp3_tick;
+        check_digits(24'h010201, "clock must keep running while alarm sounds");
+        if (dut.alarm_active !== 1'b1) begin
+            $display("FAIL alarm should remain active while time keeps advancing");
+            $finish;
+        end
+
         speaker_sample = lg1_d7;
         #15;
         if (lg1_d7 === speaker_sample) begin
