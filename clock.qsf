@@ -48,6 +48,7 @@ set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
 set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85
 set_global_assignment -name VERILOG_FILE src/clock.v
 
+set_location_assignment PIN_57 -to cp2
 set_location_assignment PIN_58 -to cp3
 set_location_assignment PIN_1 -to clr_n
 set_location_assignment PIN_60 -to qd

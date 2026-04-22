@@ -1,6 +1,7 @@
 `timescale 1ns / 1ps
 
 module clock(
+    input  wire cp2,
     input  wire cp3,
     input  wire clr_n,
     input  wire qd,
@@ -40,6 +41,12 @@ module clock(
     reg        run_enable;
     reg [23:0] digits;
 
+    reg [2:0] cp3_sync;
+    reg [2:0] qd_sync;
+    reg [2:0] pulse_sync;
+    reg [1:0] k0_sync;
+    reg [1:0] k1_sync;
+
     wire [3:0] sec_ones = digits[3:0];
     wire [3:0] sec_tens = digits[7:4];
     wire [3:0] min_ones = digits[11:8];
@@ -48,6 +55,13 @@ module clock(
     wire [3:0] hour_tens = digits[23:20];
 
     wire [6:0] lg1_segments = seg7_cc(sec_ones);
+
+    wire cp3_rise   = (cp3_sync[2:1]   == 2'b01);
+    wire qd_rise    = (qd_sync[2:1]    == 2'b01);
+    wire pulse_rise = (pulse_sync[2:1] == 2'b01);
+
+    wire k0_level = k0_sync[1];
+    wire k1_level = k1_sync[1];
 
     function [7:0] inc_hour_pair;
         input [7:0] current;
@@ -87,13 +101,9 @@ module clock(
             h_ones = current[19:16];
             m_tens = current[15:12];
             m_ones = current[11:8];
-            next_hour = 8'h00;
-
             next_hour = inc_hour_pair({h_tens, h_ones});
-            h_tens = next_hour[7:4];
-            h_ones = next_hour[3:0];
 
-            inc_hour = {h_tens, h_ones, m_tens, m_ones, 4'd0, 4'd0};
+            inc_hour = {next_hour[7:4], next_hour[3:0], m_tens, m_ones, 4'd0, 4'd0};
         end
     endfunction
 
@@ -192,32 +202,36 @@ module clock(
         end
     endfunction
 
-    always @(negedge clr_n or posedge qd) begin
+    always @(negedge clr_n or posedge cp2) begin
         if (!clr_n) begin
             run_enable <= 1'b1;
-        end else begin
-            run_enable <= ~run_enable;
-        end
-    end
-
-    always @(negedge clr_n or posedge cp3 or posedge pulse) begin
-        if (!clr_n) begin
             digits <= 24'h000000;
-        end else if (pulse) begin
-            if (!run_enable) begin
-                if (k0) begin
-                    digits <= inc_hour(digits);
-                end else if (k1) begin
-                    digits <= inc_minute(digits);
-                end else begin
-                    digits <= digits;
-                end
+            cp3_sync <= 3'b000;
+            qd_sync <= 3'b000;
+            pulse_sync <= 3'b000;
+            k0_sync <= 2'b00;
+            k1_sync <= 2'b00;
+        end else begin
+            cp3_sync <= {cp3_sync[1:0], cp3};
+            qd_sync <= {qd_sync[1:0], qd};
+            pulse_sync <= {pulse_sync[1:0], pulse};
+            k0_sync <= {k0_sync[0], k0};
+            k1_sync <= {k1_sync[0], k1};
+
+            if (qd_rise) begin
+                run_enable <= ~run_enable;
             end
-        end else if (cp3) begin
+
             if (run_enable) begin
-                digits <= inc_second(digits);
-            end else begin
-                digits <= digits;
+                if (cp3_rise) begin
+                    digits <= inc_second(digits);
+                end
+            end else if (pulse_rise) begin
+                if (k0_level) begin
+                    digits <= inc_hour(digits);
+                end else if (k1_level) begin
+                    digits <= inc_minute(digits);
+                end
             end
         end
     end

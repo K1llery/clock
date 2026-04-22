@@ -2,6 +2,7 @@
 
 module tb_clock;
 
+    reg cp2;
     reg cp3;
     reg clr_n;
     reg qd;
@@ -39,6 +40,7 @@ module tb_clock;
     wire lg6_d;
 
     clock dut (
+        .cp2(cp2),
         .cp3(cp3),
         .clr_n(clr_n),
         .qd(qd),
@@ -75,24 +77,29 @@ module tb_clock;
         .lg6_d(lg6_d)
     );
 
+    always #5 cp2 = ~cp2;
+
     task cp3_tick;
         begin
-            #5 cp3 = 1'b1;
-            #5 cp3 = 1'b0;
+            #9 cp3 = 1'b1;
+            #12 cp3 = 1'b0;
+            #9;
         end
     endtask
 
     task qd_pulse;
         begin
-            #5 qd = 1'b1;
-            #5 qd = 1'b0;
+            #9 qd = 1'b1;
+            #12 qd = 1'b0;
+            #9;
         end
     endtask
 
     task pulse_btn;
         begin
-            #5 pulse = 1'b1;
-            #5 pulse = 1'b0;
+            #9 pulse = 1'b1;
+            #12 pulse = 1'b0;
+            #9;
         end
     endtask
 
@@ -100,7 +107,7 @@ module tb_clock;
         input [23:0] expected;
         input [255:0] label;
         begin
-            #1;
+            #12;
             if (dut.digits !== expected) begin
                 $display("FAIL %0s expected=%h got=%h", label, expected, dut.digits);
                 $finish;
@@ -126,6 +133,7 @@ module tb_clock;
     endtask
 
     initial begin
+        cp2 = 1'b0;
         cp3 = 1'b0;
         clr_n = 1'b1;
         qd = 1'b0;
@@ -135,6 +143,7 @@ module tb_clock;
 
         #2 clr_n = 1'b0;
         #8 clr_n = 1'b1;
+        #20;
 
         check_digits(24'h000000, "reset");
         if (dut.run_enable !== 1'b1) begin
@@ -153,7 +162,7 @@ module tb_clock;
         check_bcd_bus(4'd0, lg2_a, lg2_b, lg2_c, lg2_d, "sec tens");
 
         qd_pulse;
-        #1;
+        #12;
         if (dut.run_enable !== 1'b0) begin
             $display("FAIL qd should pause the clock");
             $finish;
@@ -176,7 +185,7 @@ module tb_clock;
 
         dut.digits = 24'h235958;
         qd_pulse;
-        #1;
+        #12;
         if (dut.run_enable !== 1'b1) begin
             $display("FAIL qd should resume the clock");
             $finish;
