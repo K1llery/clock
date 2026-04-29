@@ -160,6 +160,16 @@ module tb_clock;
         end
     endtask
 
+    task check_visible_seconds;
+        input [3:0] expected_tens;
+        input [3:0] expected_ones;
+        input [255:0] label;
+        begin
+            check_bcd_bus(expected_tens, lg3_a, lg3_b, lg3_c, lg3_d, label);
+            check_bcd_bus(expected_ones, lg2_a, lg2_b, lg2_c, lg2_d, label);
+        end
+    endtask
+
     initial begin
         cp2 = 1'b0;
         cp3 = 1'b0;
@@ -192,9 +202,13 @@ module tb_clock;
             expected_sec_ones = second_index % 10;
             expected_seconds = {expected_sec_tens, expected_sec_ones};
             check_digits({16'h0000, expected_seconds}, "continuous seconds 00-59");
+            if ((second_index == 40) || (second_index == 50) || (second_index == 59)) begin
+                check_visible_seconds(expected_sec_tens, expected_sec_ones, "visible seconds on LG3/LG2");
+            end
         end
         cp3_tick;
         check_digits(24'h000100, "seconds roll to next minute after 59");
+        check_visible_seconds(4'd0, 4'd0, "visible seconds reset only after 59");
 
         #2 clr_n = 1'b0;
         #8 clr_n = 1'b1;
@@ -204,11 +218,7 @@ module tb_clock;
         cp3_tick;
         cp3_tick;
         check_digits(24'h000003, "count three seconds with alarm disabled");
-        if (dut.lg1_segments !== 7'b1001111) begin
-            $display("FAIL direct 7-seg decode for digit 3 is wrong");
-            $finish;
-        end
-        check_bcd_bus(4'd0, lg2_a, lg2_b, lg2_c, lg2_d, "sec tens");
+        check_visible_seconds(4'd0, 4'd3, "count three visible seconds");
 
         qd_pulse;
         wait_sync;
@@ -223,19 +233,22 @@ module tb_clock;
         k1 = 1'b1;
         pulse_btn;
         check_digits(24'h000100, "minute adjust");
-        check_bcd_bus(4'd1, lg3_a, lg3_b, lg3_c, lg3_d, "minute ones");
+        check_bcd_bus(4'd1, lg4_a, lg4_b, lg4_c, lg4_d, "minute ones");
         k1 = 1'b0;
 
         k0 = 1'b1;
         pulse_btn;
         check_digits(24'h010100, "hour adjust");
-        check_bcd_bus(4'd1, lg5_a, lg5_b, lg5_c, lg5_d, "hour ones");
+        check_bcd_bus(4'd1, lg6_a, lg6_b, lg6_c, lg6_d, "hour ones");
         k0 = 1'b0;
 
         k2 = 1'b1;
         wait_sync;
-        check_bcd_bus(4'd0, lg6_a, lg6_b, lg6_c, lg6_d, "alarm hour tens display");
-        check_bcd_bus(4'd0, lg5_a, lg5_b, lg5_c, lg5_d, "alarm hour ones display");
+        if (dut.lg1_segments !== 7'b0111111) begin
+            $display("FAIL alarm hour tens display should be 0");
+            $finish;
+        end
+        check_bcd_bus(4'd0, lg6_a, lg6_b, lg6_c, lg6_d, "alarm hour ones display");
 
         k0 = 1'b1;
         pulse_btn;
@@ -245,12 +258,9 @@ module tb_clock;
         pulse_btn;
         k1 = 1'b0;
         check_alarm_digits(16'h0102, "alarm setting");
-        check_bcd_bus(4'd1, lg5_a, lg5_b, lg5_c, lg5_d, "alarm display hour ones");
-        check_bcd_bus(4'd2, lg3_a, lg3_b, lg3_c, lg3_d, "alarm display minute ones");
-        if (dut.lg1_segments !== 7'b0111111) begin
-            $display("FAIL alarm display should force seconds to 00");
-            $finish;
-        end
+        check_bcd_bus(4'd1, lg6_a, lg6_b, lg6_c, lg6_d, "alarm display hour ones");
+        check_bcd_bus(4'd2, lg4_a, lg4_b, lg4_c, lg4_d, "alarm display minute ones");
+        check_visible_seconds(4'd0, 4'd0, "alarm display should force seconds to 00");
 
         qd_pulse;
         wait_sync;

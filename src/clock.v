@@ -65,7 +65,7 @@ module clock(
     wire [3:0] hour_ones = shown_digits[19:16];
     wire [3:0] hour_tens = shown_digits[23:20];
 
-    wire [6:0] lg1_segments = seg7_cc(sec_ones);
+    wire [6:0] lg1_segments = seg7_cc(hour_tens);
     wire [23:0] next_time_digits = inc_second(digits);
 
     wire cp3_rise = (cp3_sync[2:1] == 2'b01);
@@ -332,29 +332,29 @@ module clock(
     assign lg1_d6 = lg1_segments[6];
     assign lg1_d7 = speaker_out;
 
-    assign lg2_a = sec_tens[0];
-    assign lg2_b = sec_tens[1];
-    assign lg2_c = sec_tens[2];
-    assign lg2_d = sec_tens[3];
+    assign lg2_a = sec_ones[0];
+    assign lg2_b = sec_ones[1];
+    assign lg2_c = sec_ones[2];
+    assign lg2_d = sec_ones[3];
 
-    assign lg3_a = min_ones[0];
-    assign lg3_b = min_ones[1];
-    assign lg3_c = min_ones[2];
-    assign lg3_d = min_ones[3];
+    assign lg3_a = sec_tens[0];
+    assign lg3_b = sec_tens[1];
+    assign lg3_c = sec_tens[2];
+    assign lg3_d = sec_tens[3];
 
-    assign lg4_a = min_tens[0];
-    assign lg4_b = min_tens[1];
-    assign lg4_c = min_tens[2];
-    assign lg4_d = min_tens[3];
+    assign lg4_a = min_ones[0];
+    assign lg4_b = min_ones[1];
+    assign lg4_c = min_ones[2];
+    assign lg4_d = min_ones[3];
 
-    assign lg5_a = hour_ones[0];
-    assign lg5_b = hour_ones[1];
-    assign lg5_c = hour_ones[2];
-    assign lg5_d = hour_ones[3];
+    assign lg5_a = min_tens[0];
+    assign lg5_b = min_tens[1];
+    assign lg5_c = min_tens[2];
+    assign lg5_d = min_tens[3];
 
-    assign lg6_a = hour_tens[0];
-    assign lg6_b = hour_tens[1];
-    assign lg6_c = hour_tens[2];
-    assign lg6_d = hour_tens[3];
+    assign lg6_a = hour_ones[0];
+    assign lg6_b = hour_ones[1];
+    assign lg6_c = hour_ones[2];
+    assign lg6_d = hour_ones[3];
 
 endmodule
