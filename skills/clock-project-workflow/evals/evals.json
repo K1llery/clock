@@ -1,0 +1,36 @@
+{
+  "skill_name": "clock-project-workflow",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "继续这个 D:\\clock 项目。上板后闹钟响铃时秒钟不走了，请先分析原因，再修改 RTL、补仿真，最后把结果提交到 git。",
+      "expected_output": "The assistant should inspect the repo, identify the control-flow cause, update the RTL and testbench, run iverilog and Quartus, and report the commit hash.",
+      "files": [
+        "src/clock.v",
+        "sim/tb_clock.v",
+        "clock.qsf",
+        "README.md"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "在 TEC-8 电子钟里加一个倒计时模式。要先看当前工程状态和设计说明，再给出计划，改完后必须跑 iverilog 和 Quartus，并且用 git 提交。",
+      "expected_output": "The assistant should follow the repo workflow, inspect context first, produce a concrete plan, implement the feature, verify with simulation and compile, and commit the result.",
+      "files": [
+        "src/clock.v",
+        "sim/tb_clock.v",
+        "docs/superpowers/specs/2026-04-22-tec8-clock-design.md"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "帮我继续这个 Verilog 电子钟工程，只做排查，不要立刻写代码。我要知道现在的控制键、时钟源、仿真命令和 git 状态。",
+      "expected_output": "The assistant should inspect the repo and summarize the current state, commands, and controls without making premature edits.",
+      "files": [
+        "README.md",
+        "src/clock.v",
+        "clock.qsf"
+      ]
+    }
+  ]
+}
