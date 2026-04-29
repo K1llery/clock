@@ -43,12 +43,12 @@
 
 ## 显示分配
 
-- `LG1`：时十位，采用共阴极 7 段直译码
-- `LG2`：秒个位，BCD
-- `LG3`：秒十位，BCD
-- `LG4`：分个位，BCD
-- `LG5`：分十位，BCD
-- `LG6`：时个位，BCD
+- `LG1`：秒个位，采用共阴极 7 段直译码
+- `LG2`：秒十位，BCD
+- `LG3`：分个位，BCD
+- `LG4`：分十位，BCD
+- `LG5`：时个位，BCD
+- `LG6`：时十位，BCD
 
 ## 工程文件
 
@@ -67,4 +67,4 @@ quartus_sh --flow compile clock
 ## 编译结果
 
 - `Quartus` 输出编程文件：`clock.pof`
-- 资源占用：`120 / 128 macrocells`
+- 资源占用：`113 / 128 macrocells`

@@ -2,11 +2,11 @@
 
 ## Goal
 
-Implement a resource-conscious electronic clock with a single alarm feature for the TEC-8 platform on the `EPM7128SLC84-15` CPLD. The display format is `HH:MM:SS`, with `LG1` driven by direct 7-segment decode and the other five digits driven as BCD outputs.
+Implement a resource-conscious electronic clock with a single alarm feature for the TEC-8 platform on the `EPM7128SLC84-15` CPLD. The display format is `HH:MM:SS`, with the lowest digit driven by direct 7-segment decode and the other five digits driven as BCD outputs.
 
 ## Platform Constraints
 
-- `LG1` must be driven directly through `LG1-D0..D6`.
+- `LG1` is the lowest digit and must be driven directly through `LG1-D0..D6`.
 - `LG2..LG6` expose 4-bit BCD outputs (`A` = LSB, `D` = MSB).
 - The seven-segment display is common cathode, so direct segment outputs are active high.
 - Required control signals are `CLR#`, `QD`, and `PULSE`.
@@ -38,7 +38,6 @@ Implement a resource-conscious electronic clock with a single alarm feature for 
 - Display behavior:
   - `K2=0`: show current time
   - `K2=1`: show alarm time as `HH:MM:00`
-  - `LG1` shows hour tens, `LG6` hour ones, `LG5` minute tens, `LG4` minute ones, `LG3` second tens, and `LG2` second ones
 - Alarm behavior:
   - trigger when current time reaches `alarm_hour:alarm_minute:00`
   - keep sounding until `QD` is pressed or `K3` is cleared

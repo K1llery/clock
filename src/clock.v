@@ -65,8 +65,7 @@ module clock(
     wire [3:0] hour_ones = shown_digits[19:16];
     wire [3:0] hour_tens = shown_digits[23:20];
 
-    wire [6:0] lg1_segments = seg7_cc(hour_tens);
-    wire [23:0] next_time_digits = inc_second(digits);
+    wire [6:0] lg1_segments = seg7_cc(sec_ones);
 
     wire cp3_rise = (cp3_sync[2:1] == 2'b01);
     wire qd_rise = (qd_sync[2:1] == 2'b01);
@@ -183,56 +182,27 @@ module clock(
         end
     endfunction
 
-    function [23:0] inc_second;
-        input [23:0] current;
-        reg [3:0] h_tens;
-        reg [3:0] h_ones;
-        reg [3:0] m_tens;
-        reg [3:0] m_ones;
-        reg [3:0] s_tens;
-        reg [3:0] s_ones;
-        reg [7:0] next_hour;
-        begin
-            h_tens = current[23:20];
-            h_ones = current[19:16];
-            m_tens = current[15:12];
-            m_ones = current[11:8];
-            s_tens = current[7:4];
-            s_ones = current[3:0];
-            next_hour = 8'h00;
-
-            if (s_ones == 4'd9) begin
-                s_ones = 4'd0;
-                if (s_tens == 4'd5) begin
-                    s_tens = 4'd0;
-                    if ((m_tens == 4'd5) && (m_ones == 4'd9)) begin
-                        m_tens = 4'd0;
-                        m_ones = 4'd0;
-                        next_hour = inc_hour_pair({h_tens, h_ones});
-                        h_tens = next_hour[7:4];
-                        h_ones = next_hour[3:0];
-                    end else if (m_ones == 4'd9) begin
-                        m_ones = 4'd0;
-                        m_tens = m_tens + 4'd1;
-                    end else begin
-                        m_ones = m_ones + 4'd1;
-                    end
-                end else begin
-                    s_tens = s_tens + 4'd1;
-                end
-            end else begin
-                s_ones = s_ones + 4'd1;
-            end
-
-            inc_second = {h_tens, h_ones, m_tens, m_ones, s_tens, s_ones};
-        end
-    endfunction
-
-    function alarm_match;
+    function alarm_match_after_tick;
         input [23:0] current_time;
         input [15:0] current_alarm;
+        reg [15:0] next_hhmm;
+        reg [7:0] next_hour;
         begin
-            alarm_match = (current_time[23:8] == current_alarm) && (current_time[7:0] == 8'h00);
+            next_hhmm = current_time[23:8];
+            next_hour = 8'h00;
+
+            if (current_time[7:0] == 8'h59) begin
+                if (current_time[15:8] == 8'h59) begin
+                    next_hour = inc_hour_pair(current_time[23:16]);
+                    next_hhmm = {next_hour, 8'h00};
+                end else if (current_time[11:8] == 4'd9) begin
+                    next_hhmm = {current_time[23:16], current_time[15:12] + 4'd1, 4'd0};
+                end else begin
+                    next_hhmm = {current_time[23:16], current_time[15:12], current_time[11:8] + 4'd1};
+                end
+            end
+
+            alarm_match_after_tick = (current_time[7:0] == 8'h59) && (next_hhmm == current_alarm);
         end
     endfunction
 
@@ -302,9 +272,42 @@ module clock(
 
             if (run_enable) begin
                 if (cp3_rise) begin
-                    digits <= next_time_digits;
-                    if (alarm_enable && !alarm_active && alarm_match(next_time_digits, alarm_digits)) begin
+                    if (alarm_enable && !alarm_active && alarm_match_after_tick(digits, alarm_digits)) begin
                         alarm_active <= 1'b1;
+                    end
+
+                    if (digits[3:0] == 4'd9) begin
+                        digits[3:0] <= 4'd0;
+                        case (digits[7:4])
+                            4'd0: digits[7:4] <= 4'd1;
+                            4'd1: digits[7:4] <= 4'd2;
+                            4'd2: digits[7:4] <= 4'd3;
+                            4'd3: digits[7:4] <= 4'd4;
+                            4'd4: digits[7:4] <= 4'd5;
+                            default: begin
+                                digits[7:4] <= 4'd0;
+                                if ((digits[15:12] == 4'd5) && (digits[11:8] == 4'd9)) begin
+                                    digits[15:12] <= 4'd0;
+                                    digits[11:8] <= 4'd0;
+                                    if ((digits[23:20] == 4'd2) && (digits[19:16] == 4'd3)) begin
+                                        digits[23:20] <= 4'd0;
+                                        digits[19:16] <= 4'd0;
+                                    end else if (digits[19:16] == 4'd9) begin
+                                        digits[19:16] <= 4'd0;
+                                        digits[23:20] <= digits[23:20] + 4'd1;
+                                    end else begin
+                                        digits[19:16] <= digits[19:16] + 4'd1;
+                                    end
+                                end else if (digits[11:8] == 4'd9) begin
+                                    digits[11:8] <= 4'd0;
+                                    digits[15:12] <= digits[15:12] + 4'd1;
+                                end else begin
+                                    digits[11:8] <= digits[11:8] + 4'd1;
+                                end
+                            end
+                        endcase
+                    end else begin
+                        digits[3:0] <= digits[3:0] + 4'd1;
                     end
                 end
             end else if (!alarm_active && pulse_rise) begin
@@ -332,29 +335,29 @@ module clock(
     assign lg1_d6 = lg1_segments[6];
     assign lg1_d7 = speaker_out;
 
-    assign lg2_a = sec_ones[0];
-    assign lg2_b = sec_ones[1];
-    assign lg2_c = sec_ones[2];
-    assign lg2_d = sec_ones[3];
+    assign lg2_a = sec_tens[0];
+    assign lg2_b = sec_tens[1];
+    assign lg2_c = sec_tens[2];
+    assign lg2_d = sec_tens[3];
 
-    assign lg3_a = sec_tens[0];
-    assign lg3_b = sec_tens[1];
-    assign lg3_c = sec_tens[2];
-    assign lg3_d = sec_tens[3];
+    assign lg3_a = min_ones[0];
+    assign lg3_b = min_ones[1];
+    assign lg3_c = min_ones[2];
+    assign lg3_d = min_ones[3];
 
-    assign lg4_a = min_ones[0];
-    assign lg4_b = min_ones[1];
-    assign lg4_c = min_ones[2];
-    assign lg4_d = min_ones[3];
+    assign lg4_a = min_tens[0];
+    assign lg4_b = min_tens[1];
+    assign lg4_c = min_tens[2];
+    assign lg4_d = min_tens[3];
 
-    assign lg5_a = min_tens[0];
-    assign lg5_b = min_tens[1];
-    assign lg5_c = min_tens[2];
-    assign lg5_d = min_tens[3];
+    assign lg5_a = hour_ones[0];
+    assign lg5_b = hour_ones[1];
+    assign lg5_c = hour_ones[2];
+    assign lg5_d = hour_ones[3];
 
-    assign lg6_a = hour_ones[0];
-    assign lg6_b = hour_ones[1];
-    assign lg6_c = hour_ones[2];
-    assign lg6_d = hour_ones[3];
+    assign lg6_a = hour_tens[0];
+    assign lg6_b = hour_tens[1];
+    assign lg6_c = hour_tens[2];
+    assign lg6_d = hour_tens[3];
 
 endmodule
