@@ -2,6 +2,7 @@
 
 module tb_clock;
 
+    reg cp1;
     reg cp2;
     reg cp3;
     reg clr_n;
@@ -40,13 +41,16 @@ module tb_clock;
     wire lg6_b;
     wire lg6_c;
     wire lg6_d;
-    reg  speaker_sample;
     integer second_index;
+    integer tone_sample_index;
     reg [7:0] expected_seconds;
     reg [3:0] expected_sec_tens;
     reg [3:0] expected_sec_ones;
+    reg saw_speaker_low;
+    reg saw_speaker_high;
 
     clock dut (
+        .cp1(cp1),
         .cp2(cp2),
         .cp3(cp3),
         .clr_n(clr_n),
@@ -86,6 +90,7 @@ module tb_clock;
         .lg6_d(lg6_d)
     );
 
+    always #1 cp1 = ~cp1;
     always #5 cp2 = ~cp2;
 
     task cp3_tick;
@@ -194,6 +199,7 @@ module tb_clock;
     endtask
 
     initial begin
+        cp1 = 1'b0;
         cp2 = 1'b0;
         cp3 = 1'b0;
         clr_n = 1'b1;
@@ -331,10 +337,18 @@ module tb_clock;
             $finish;
         end
 
-        speaker_sample = lg1_d7;
-        #15;
-        if (lg1_d7 === speaker_sample) begin
-            $display("FAIL speaker output should toggle while alarm is active");
+        saw_speaker_low = 1'b0;
+        saw_speaker_high = 1'b0;
+        for (tone_sample_index = 0; tone_sample_index < 400; tone_sample_index = tone_sample_index + 1) begin
+            #2;
+            if (lg1_d7 === 1'b0) begin
+                saw_speaker_low = 1'b1;
+            end else if (lg1_d7 === 1'b1) begin
+                saw_speaker_high = 1'b1;
+            end
+        end
+        if (!saw_speaker_low || !saw_speaker_high) begin
+            $display("FAIL speaker output should be a CP1-derived square wave while alarm is active");
             $finish;
         end
 

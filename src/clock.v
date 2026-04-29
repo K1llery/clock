@@ -1,6 +1,7 @@
 `timescale 1ns / 1ps
 
 module clock(
+    input  wire cp1,
     input  wire cp2,
     input  wire cp3,
     input  wire clr_n,
@@ -42,7 +43,8 @@ module clock(
 
     reg        run_enable;
     reg        alarm_active;
-    reg        alarm_tone;
+    reg [7:0]  alarm_tone_divider;
+    reg [1:0]  alarm_active_cp1_sync;
     reg [23:0] digits;
     reg [15:0] alarm_digits;
 
@@ -74,7 +76,7 @@ module clock(
 
     wire k0_level = k0_sync[1];
     wire k1_level = k1_sync[1];
-    wire speaker_out = alarm_active ? alarm_tone : 1'b0;
+    wire speaker_out = alarm_active_cp1_sync[1] ? alarm_tone_divider[7] : 1'b0;
 
     function [7:0] inc_hour_pair;
         input [7:0] current;
@@ -229,7 +231,6 @@ module clock(
         if (!clr_n) begin
             run_enable <= 1'b1;
             alarm_active <= 1'b0;
-            alarm_tone <= 1'b0;
             digits <= 24'h000000;
             alarm_digits <= 16'h0000;
             cp3_sync <= 3'b000;
@@ -250,21 +251,15 @@ module clock(
 
             if (!alarm_enable) begin
                 alarm_active <= 1'b0;
-                alarm_tone <= 1'b0;
             end else if (alarm_active) begin
-                alarm_tone <= ~alarm_tone;
                 if (qd_rise && qd_control_allowed) begin
                     alarm_active <= 1'b0;
-                    alarm_tone <= 1'b0;
                 end
-            end else begin
-                alarm_tone <= 1'b0;
             end
 
             if (qd_rise && qd_control_allowed) begin
                 if (alarm_active) begin
                     alarm_active <= 1'b0;
-                    alarm_tone <= 1'b0;
                 end else begin
                     run_enable <= ~run_enable;
                 end
@@ -322,6 +317,20 @@ module clock(
                 end else if (k1_level) begin
                     digits <= inc_minute(digits);
                 end
+            end
+        end
+    end
+
+    always @(negedge clr_n or posedge cp1) begin
+        if (!clr_n) begin
+            alarm_active_cp1_sync <= 2'b00;
+            alarm_tone_divider <= 8'h00;
+        end else begin
+            alarm_active_cp1_sync <= {alarm_active_cp1_sync[0], alarm_active};
+            if (alarm_active_cp1_sync[1]) begin
+                alarm_tone_divider <= alarm_tone_divider + 8'd1;
+            end else begin
+                alarm_tone_divider <= 8'h00;
             end
         end
     end

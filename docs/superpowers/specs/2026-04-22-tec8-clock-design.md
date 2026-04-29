@@ -27,9 +27,11 @@ Implement a resource-conscious electronic clock with a single alarm feature for 
 - Use `CP2` as the single synchronous clock domain for the design.
 - Synchronize `CP3`, `QD`, `PULSE`, and `K0..K3` into the `CP2` domain.
 - Treat `CP3` only as a synchronized second-tick source.
+- Use `CP1` only for the alarm speaker tone divider; keep timekeeping and controls in the `CP2` domain.
 - Recommended bench setup:
+  - `CP1` set to `100KHz` for an audible divided alarm tone
   - `CP3` set to `1Hz`
-  - `CP2` set to `1KHz` when possible for a better alarm tone
+  - `CP2` set to `1KHz` when possible for responsive control sampling
 - Keep the control path minimal:
   - asynchronous clear on `CLR#`
   - `QD` toggles a single `run_enable` bit
@@ -41,7 +43,7 @@ Implement a resource-conscious electronic clock with a single alarm feature for 
 - Alarm behavior:
   - trigger when current time reaches `alarm_hour:alarm_minute:00`
   - keep sounding until `QD` is pressed or `K3` is cleared
-  - use a small synchronous tone flip-flop to drive the speaker with minimal logic
+  - use a small `CP1`-clocked divider to drive the speaker with a square wave instead of a constant level
 
 ## Root Cause Notes
 

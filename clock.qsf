@@ -48,6 +48,7 @@ set_global_assignment -name MIN_CORE_JUNCTION_TEMP 0
 set_global_assignment -name MAX_CORE_JUNCTION_TEMP 85
 set_global_assignment -name VERILOG_FILE src/clock.v
 
+set_location_assignment PIN_56 -to cp1
 set_location_assignment PIN_57 -to cp2
 set_location_assignment PIN_58 -to cp3
 set_location_assignment PIN_1 -to clr_n
@@ -91,3 +92,5 @@ set_location_assignment PIN_20 -to lg6_a
 set_location_assignment PIN_21 -to lg6_b
 set_location_assignment PIN_22 -to lg6_c
 set_location_assignment PIN_24 -to lg6_d
+
+set_global_assignment -name MISC_FILE "D:/clock/clock.dpf"
