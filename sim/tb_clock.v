@@ -41,6 +41,10 @@ module tb_clock;
     wire lg6_c;
     wire lg6_d;
     reg  speaker_sample;
+    integer second_index;
+    reg [7:0] expected_seconds;
+    reg [3:0] expected_sec_tens;
+    reg [3:0] expected_sec_ones;
 
     clock dut (
         .cp2(cp2),
@@ -182,10 +186,24 @@ module tb_clock;
             $finish;
         end
 
+        for (second_index = 1; second_index < 60; second_index = second_index + 1) begin
+            cp3_tick;
+            expected_sec_tens = second_index / 10;
+            expected_sec_ones = second_index % 10;
+            expected_seconds = {expected_sec_tens, expected_sec_ones};
+            check_digits({16'h0000, expected_seconds}, "continuous seconds 00-59");
+        end
+        cp3_tick;
+        check_digits(24'h000100, "seconds roll to next minute after 59");
+
+        #2 clr_n = 1'b0;
+        #8 clr_n = 1'b1;
+        wait_sync;
+
         cp3_tick;
         cp3_tick;
         cp3_tick;
-        check_digits(24'h000003, "count three seconds");
+        check_digits(24'h000003, "count three seconds with alarm disabled");
         if (dut.lg1_segments !== 7'b1001111) begin
             $display("FAIL direct 7-seg decode for digit 3 is wrong");
             $finish;
@@ -233,6 +251,15 @@ module tb_clock;
             $display("FAIL alarm display should force seconds to 00");
             $finish;
         end
+
+        qd_pulse;
+        wait_sync;
+        if (dut.run_enable !== 1'b0) begin
+            $display("FAIL qd must be ignored while K2 selects alarm setting");
+            $finish;
+        end
+        cp3_tick;
+        check_digits(24'h010100, "alarm setting must preserve paused time");
 
         k3 = 1'b1;
         wait_sync;
@@ -303,6 +330,13 @@ module tb_clock;
             $display("FAIL disabling alarm should stop the speaker");
             $finish;
         end
+        if (dut.run_enable !== 1'b1) begin
+            $display("FAIL disabling alarm must not change run state");
+            $finish;
+        end
+
+        cp3_tick;
+        check_digits(24'h010201, "clock must keep running with alarm disabled");
 
         dut.digits = 24'h235958;
         wait_sync;

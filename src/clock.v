@@ -71,6 +71,7 @@ module clock(
     wire cp3_rise = (cp3_sync[2:1] == 2'b01);
     wire qd_rise = (qd_sync[2:1] == 2'b01);
     wire pulse_rise = (pulse_sync[2:1] == 2'b01);
+    wire qd_control_allowed = !show_alarm;
 
     wire k0_level = k0_sync[1];
     wire k1_level = k1_sync[1];
@@ -282,7 +283,7 @@ module clock(
                 alarm_tone <= 1'b0;
             end else if (alarm_active) begin
                 alarm_tone <= ~alarm_tone;
-                if (qd_rise) begin
+                if (qd_rise && qd_control_allowed) begin
                     alarm_active <= 1'b0;
                     alarm_tone <= 1'b0;
                 end
@@ -290,7 +291,7 @@ module clock(
                 alarm_tone <= 1'b0;
             end
 
-            if (qd_rise) begin
+            if (qd_rise && qd_control_allowed) begin
                 if (alarm_active) begin
                     alarm_active <= 1'b0;
                     alarm_tone <= 1'b0;
