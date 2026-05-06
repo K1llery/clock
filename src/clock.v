@@ -43,7 +43,7 @@ module clock(
 
     reg        run_enable;
     reg        alarm_active;
-    reg [7:0]  alarm_tone_divider;
+    reg [6:0]  alarm_tone_divider;
     reg [1:0]  alarm_active_cp1_sync;
     reg [23:0] digits;
     reg [15:0] alarm_digits;
@@ -76,7 +76,7 @@ module clock(
 
     wire k0_level = k0_sync[1];
     wire k1_level = k1_sync[1];
-    wire speaker_out = alarm_active_cp1_sync[1] ? alarm_tone_divider[7] : 1'b0;
+    wire speaker_out = alarm_active_cp1_sync[1] ? alarm_tone_divider[6] : 1'b0;
 
     function [7:0] inc_hour_pair;
         input [7:0] current;
@@ -324,13 +324,13 @@ module clock(
     always @(negedge clr_n or posedge cp1) begin
         if (!clr_n) begin
             alarm_active_cp1_sync <= 2'b00;
-            alarm_tone_divider <= 8'h00;
+            alarm_tone_divider <= 7'h00;
         end else begin
             alarm_active_cp1_sync <= {alarm_active_cp1_sync[0], alarm_active};
             if (alarm_active_cp1_sync[1]) begin
-                alarm_tone_divider <= alarm_tone_divider + 8'd1;
+                alarm_tone_divider <= alarm_tone_divider + 7'd1;
             end else begin
-                alarm_tone_divider <= 8'h00;
+                alarm_tone_divider <= 7'h00;
             end
         end
     end
