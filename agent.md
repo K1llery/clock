@@ -35,7 +35,7 @@ quartus_sh --flow compile clock
 ## Project-specific reminders
 
 - `CP2` is the main synchronous clock domain
-- `CP1` is used only as the alarm speaker tone source; prefer `100KHz` so the divider produces an audible tone
+- `CP1` is used only as the alarm speaker tone source; prefer `100KHz` so the divider produces a sharper audible tone, currently about `3.125KHz`
 - `CP3` is the external timing tick source
 - Board issues are often caused by control gating or mode interaction, not just pin mismatches
 - Keep `README.md` updated when controls or operating procedures change
