@@ -12,6 +12,7 @@ module tb_clock;
     reg k1;
     reg k2;
     reg k3;
+    reg cp1_clock_enabled;
 
     wire lg1_d0;
     wire lg1_d1;
@@ -92,7 +93,11 @@ module tb_clock;
         .lg6_d(lg6_d)
     );
 
-    always #1 cp1 = ~cp1;
+    always #1 begin
+        if (cp1_clock_enabled) begin
+            cp1 = ~cp1;
+        end
+    end
     always #5 cp2 = ~cp2;
 
     task cp3_tick;
@@ -161,6 +166,28 @@ module tb_clock;
     task wait_sync;
         begin
             #30;
+        end
+    endtask
+
+    task sample_speaker_output;
+        input integer sample_count;
+        begin
+            saw_speaker_low = 1'b0;
+            saw_speaker_high = 1'b0;
+            speaker_transition_count = 0;
+            previous_speaker_sample = lg1_d7;
+            for (tone_sample_index = 0; tone_sample_index < sample_count; tone_sample_index = tone_sample_index + 1) begin
+                #2;
+                if (lg1_d7 !== previous_speaker_sample) begin
+                    speaker_transition_count = speaker_transition_count + 1;
+                end
+                previous_speaker_sample = lg1_d7;
+                if (lg1_d7 === 1'b0) begin
+                    saw_speaker_low = 1'b1;
+                end else if (lg1_d7 === 1'b1) begin
+                    saw_speaker_high = 1'b1;
+                end
+            end
         end
     endtask
 
@@ -250,6 +277,7 @@ module tb_clock;
         k1 = 1'b0;
         k2 = 1'b0;
         k3 = 1'b0;
+        cp1_clock_enabled = 1'b1;
 
         #2 clr_n = 1'b0;
         #8 clr_n = 1'b1;
@@ -342,9 +370,6 @@ module tb_clock;
         cp3_tick;
         check_digits(24'h010100, "alarm setting must preserve paused time");
 
-        k3 = 1'b1;
-        wait_sync;
-
         k2 = 1'b0;
         wait_sync;
         dut.digits = 24'h010158;
@@ -355,6 +380,26 @@ module tb_clock;
             $display("FAIL qd should resume the clock");
             $finish;
         end
+
+        cp3_tick;
+        check_digits(24'h010159, "alarm disabled pre-trigger second");
+        cp3_tick;
+        check_digits(24'h010200, "alarm disabled matching time");
+        wait_sync;
+        if (dut.alarm_active !== 1'b0) begin
+            $display("FAIL K3 low should keep alarm inactive at the matching time");
+            $finish;
+        end
+        sample_speaker_output(80);
+        if (speaker_transition_count !== 0) begin
+            $display("FAIL K3 low should keep speaker silent transitions=%0d", speaker_transition_count);
+            $finish;
+        end
+
+        k3 = 1'b1;
+        wait_sync;
+        dut.digits = 24'h010158;
+        wait_sync;
 
         cp3_tick;
         check_digits(24'h010159, "alarm pre-trigger second");
@@ -378,22 +423,7 @@ module tb_clock;
             $finish;
         end
 
-        saw_speaker_low = 1'b0;
-        saw_speaker_high = 1'b0;
-        speaker_transition_count = 0;
-        previous_speaker_sample = lg1_d7;
-        for (tone_sample_index = 0; tone_sample_index < 400; tone_sample_index = tone_sample_index + 1) begin
-            #2;
-            if (lg1_d7 !== previous_speaker_sample) begin
-                speaker_transition_count = speaker_transition_count + 1;
-            end
-            previous_speaker_sample = lg1_d7;
-            if (lg1_d7 === 1'b0) begin
-                saw_speaker_low = 1'b1;
-            end else if (lg1_d7 === 1'b1) begin
-                saw_speaker_high = 1'b1;
-            end
-        end
+        sample_speaker_output(400);
         if (!saw_speaker_low || !saw_speaker_high) begin
             $display("FAIL speaker output should be a CP1-derived square wave while alarm is active");
             $finish;
@@ -403,6 +433,20 @@ module tb_clock;
                 speaker_transition_count);
             $finish;
         end
+
+        cp1_clock_enabled = 1'b0;
+        sample_speaker_output(120);
+        if (dut.alarm_active !== 1'b1) begin
+            $display("FAIL stopping CP1 should not clear alarm_active");
+            $finish;
+        end
+        if (speaker_transition_count !== 0) begin
+            $display("FAIL stopped CP1 should not produce audible speaker transitions=%0d",
+                speaker_transition_count);
+            $finish;
+        end
+        cp1_clock_enabled = 1'b1;
+        wait_sync;
 
         qd_pulse;
         wait_sync;

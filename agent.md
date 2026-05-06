@@ -38,6 +38,7 @@ quartus_sh --flow compile clock
 - `CP1` is used only as the alarm speaker tone source; prefer `100KHz` so the divider produces a sharper audible tone, currently about `3.125KHz`
 - `CP3` is the external timing tick source
 - Board issues are often caused by control gating or mode interaction, not just pin mismatches
+- If the alarm does not sound on hardware, check `K3=1`, an active `CP1` clock, the `PIN_52` speaker path, and whether the latest `clock.pof` was downloaded before changing RTL
 - Keep `README.md` updated when controls or operating procedures change
 
 ## TEC-8 physical hardware constraints
