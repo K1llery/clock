@@ -43,11 +43,13 @@ module tb_clock;
     wire lg6_d;
     integer second_index;
     integer tone_sample_index;
+    integer speaker_transition_count;
     reg [7:0] expected_seconds;
     reg [3:0] expected_sec_tens;
     reg [3:0] expected_sec_ones;
     reg saw_speaker_low;
     reg saw_speaker_high;
+    reg previous_speaker_sample;
 
     clock dut (
         .cp1(cp1),
@@ -114,6 +116,45 @@ module tb_clock;
             #9 pulse = 1'b1;
             #12 pulse = 1'b0;
             #9;
+        end
+    endtask
+
+    task cp3_tick_to_alarm_boundary_with_pipeline_check;
+        begin
+            #9 cp3 = 1'b1;
+            @(posedge cp2);
+            @(posedge cp2);
+            @(posedge cp2);
+            #1;
+            if (dut.digits !== 24'h010200) begin
+                $display("FAIL alarm boundary pipeline expected time 01:02:00 got=%h", dut.digits);
+                $finish;
+            end
+            if (dut.alarm_check_pending !== 1'b1) begin
+                $display("FAIL alarm boundary should register a pending alarm check");
+                $finish;
+            end
+            if (dut.alarm_active !== 1'b0) begin
+                $display("FAIL alarm should wait one CP2 cycle after the minute boundary");
+                $finish;
+            end
+
+            @(posedge cp2);
+            #1;
+            if (dut.alarm_check_pending !== 1'b0) begin
+                $display("FAIL pending alarm check should clear after evaluation");
+                $finish;
+            end
+            if (dut.alarm_active !== 1'b1) begin
+                $display("FAIL pending alarm check should start the alarm");
+                $finish;
+            end
+
+            #2 cp3 = 1'b0;
+            @(posedge cp2);
+            @(posedge cp2);
+            @(posedge cp2);
+            #1;
         end
     endtask
 
@@ -262,8 +303,9 @@ module tb_clock;
 
         k1 = 1'b1;
         pulse_btn;
-        check_digits(24'h000100, "minute adjust");
+        check_digits(24'h000103, "minute adjust preserves seconds");
         check_bcd_bus(4'd1, lg3_a, lg3_b, lg3_c, lg3_d, "minute ones");
+        check_visible_seconds(4'd0, 4'd3, "minute adjust keeps visible seconds");
         k1 = 1'b0;
 
         k0 = 1'b1;
@@ -322,7 +364,7 @@ module tb_clock;
             $finish;
         end
 
-        cp3_tick;
+        cp3_tick_to_alarm_boundary_with_pipeline_check;
         check_digits(24'h010200, "alarm trigger time");
         wait_sync;
         if (dut.alarm_active !== 1'b1) begin
@@ -339,8 +381,14 @@ module tb_clock;
 
         saw_speaker_low = 1'b0;
         saw_speaker_high = 1'b0;
+        speaker_transition_count = 0;
+        previous_speaker_sample = lg1_d7;
         for (tone_sample_index = 0; tone_sample_index < 400; tone_sample_index = tone_sample_index + 1) begin
             #2;
+            if (lg1_d7 !== previous_speaker_sample) begin
+                speaker_transition_count = speaker_transition_count + 1;
+            end
+            previous_speaker_sample = lg1_d7;
             if (lg1_d7 === 1'b0) begin
                 saw_speaker_low = 1'b1;
             end else if (lg1_d7 === 1'b1) begin
@@ -349,6 +397,11 @@ module tb_clock;
         end
         if (!saw_speaker_low || !saw_speaker_high) begin
             $display("FAIL speaker output should be a CP1-derived square wave while alarm is active");
+            $finish;
+        end
+        if ((speaker_transition_count < 20) || (speaker_transition_count > 30)) begin
+            $display("FAIL speaker output should use a higher audible tone near CP1/32 transitions=%0d",
+                speaker_transition_count);
             $finish;
         end
 
