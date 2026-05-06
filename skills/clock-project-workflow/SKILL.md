@@ -62,7 +62,7 @@ If the user asks for a simple explanation, the plan can be shorter, but still in
 - For RTL optimization work, use pages 29-33 of `2026数字课程设计 - verilog讲座-修订版.pdf` as the Verilog checklist:
   - meaningful names and sparse comments for state/control or timing-sensitive paths
   - synthesizable RTL only in `src/clock.v`; keep delays, `initial`, division/modulo, and other simulation-only constructs in `sim/tb_clock.v`
-  - CP2 remains the main register clock domain and also provides the alarm speaker tone; CP1 is unused by the RTL
+  - CP2 remains the main register clock domain and also provides the alarm speaker tone; synchronized CP3 provides the one-second alarm beep cadence; CP1 is unused by the RTL
   - split combinational next-value calculation from sequential register updates; use blocking assignments for combinational logic and non-blocking assignments for clocked registers
   - prefer complete `case` statements with defaults over long priority chains when it improves latch safety or timing clarity
   - if Quartus reports a long control path, consider a small registered/pipelined check before adding more same-cycle combinational matching

@@ -26,11 +26,11 @@ Implement a resource-conscious electronic clock with a single alarm feature for 
 - Store alarm time directly as four BCD digits (`HHMM`) to avoid conversion logic.
 - Use `CP2` as the single synchronous clock domain for the design.
 - Synchronize `CP3`, `QD`, `PULSE`, and `K0..K3` into the `CP2` domain.
-- Treat `CP3` only as a synchronized second-tick source.
+- Treat `CP3` as a synchronized second-tick source and the alarm beep cadence source.
 - Reuse `CP2` for the alarm speaker tone so the RTL no longer consumes the `CP1` input.
 - Recommended bench setup:
   - `CP2` set to `1KHz` for responsive control sampling and an audible tone near `500Hz`
-  - `CP3` set to `1Hz`
+  - `CP3` set to `1Hz` so alarm beeps are spaced by about one second
   - `CP1` left unused
 - Keep the control path minimal:
   - asynchronous clear on `CLR#`
@@ -43,7 +43,8 @@ Implement a resource-conscious electronic clock with a single alarm feature for 
 - Alarm behavior:
   - trigger when current time reaches `alarm_hour:alarm_minute:00`
   - keep sounding until `QD` is pressed or `K3` is cleared
-  - use a `CP2`-clocked tone flip-flop to drive the speaker with a square wave instead of a constant level
+  - use a `CP2`-clocked tone flip-flop gated by a short beep window
+  - restart that short beep window on each synchronized `CP3` second tick while the alarm remains active
 
 ## Root Cause Notes
 

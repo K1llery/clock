@@ -42,6 +42,7 @@ module tb_clock;
     wire lg6_d;
     integer second_index;
     integer tone_sample_index;
+    integer speaker_cycle_index;
     integer speaker_transition_count;
     reg [7:0] expected_seconds;
     reg [3:0] expected_sec_tens;
@@ -179,6 +180,39 @@ module tb_clock;
                 end else if (lg1_d7 === 1'b1) begin
                     saw_speaker_high = 1'b1;
                 end
+            end
+        end
+    endtask
+
+    task sample_speaker_for_cp2_cycles;
+        input integer cycle_count;
+        begin
+            saw_speaker_low = 1'b0;
+            saw_speaker_high = 1'b0;
+            speaker_transition_count = 0;
+            previous_speaker_sample = lg1_d7;
+            for (speaker_cycle_index = 0; speaker_cycle_index < cycle_count; speaker_cycle_index = speaker_cycle_index + 1) begin
+                @(posedge cp2);
+                #1;
+                if (lg1_d7 !== previous_speaker_sample) begin
+                    speaker_transition_count = speaker_transition_count + 1;
+                end
+                previous_speaker_sample = lg1_d7;
+                if (lg1_d7 === 1'b0) begin
+                    saw_speaker_low = 1'b1;
+                end else if (lg1_d7 === 1'b1) begin
+                    saw_speaker_high = 1'b1;
+                end
+            end
+        end
+    endtask
+
+    task wait_cp2_cycles;
+        input integer cycle_count;
+        begin
+            for (speaker_cycle_index = 0; speaker_cycle_index < cycle_count; speaker_cycle_index = speaker_cycle_index + 1) begin
+                @(posedge cp2);
+                #1;
             end
         end
     endtask
@@ -414,24 +448,42 @@ module tb_clock;
             $finish;
         end
 
-        sample_speaker_output(400);
+        sample_speaker_for_cp2_cycles(60);
         if (!saw_speaker_low || !saw_speaker_high) begin
-            $display("FAIL speaker output should be a CP2-derived square wave while alarm is active");
+            $display("FAIL speaker output should start with a short CP2-derived beep while alarm is active");
             $finish;
         end
-        if ((speaker_transition_count < 65) || (speaker_transition_count > 95)) begin
-            $display("FAIL speaker output should use a CP2-derived audible tone near CP2/2 transitions=%0d",
+        if ((speaker_transition_count < 45) || (speaker_transition_count > 65)) begin
+            $display("FAIL speaker beep should use a CP2-derived audible tone near CP2/2 transitions=%0d",
                 speaker_transition_count);
             $finish;
         end
 
-        sample_speaker_output(120);
+        wait_cp2_cycles(90);
+        sample_speaker_for_cp2_cycles(60);
         if (dut.alarm_active !== 1'b1) begin
-            $display("FAIL speaker sampling should not clear alarm_active");
+            $display("FAIL silent gap should not clear alarm_active");
             $finish;
         end
-        if ((speaker_transition_count < 20) || (speaker_transition_count > 30)) begin
-            $display("FAIL speaker should keep using CP2 with CP1 absent transitions=%0d",
+        if (speaker_transition_count !== 0) begin
+            $display("FAIL speaker should be silent between one-second alarm beeps transitions=%0d",
+                speaker_transition_count);
+            $finish;
+        end
+        if (lg1_d7 !== 1'b0) begin
+            $display("FAIL speaker output should rest low between alarm beeps");
+            $finish;
+        end
+
+        cp3_tick;
+        check_digits(24'h010202, "next second while alarm sounds");
+        sample_speaker_for_cp2_cycles(60);
+        if (!saw_speaker_low || !saw_speaker_high) begin
+            $display("FAIL next CP3 second should start the next alarm beep");
+            $finish;
+        end
+        if ((speaker_transition_count < 45) || (speaker_transition_count > 65)) begin
+            $display("FAIL repeated beep should use the same CP2-derived audible tone transitions=%0d",
                 speaker_transition_count);
             $finish;
         end

@@ -40,10 +40,13 @@ module clock(
     output wire lg6_d
 );
 
+    parameter [6:0] ALARM_BEEP_TICKS = 7'd125;
+
     reg        run_enable;
     reg        alarm_active;
     reg        alarm_check_pending;
     reg        alarm_tone;
+    reg [6:0]  alarm_beep_ticks;
     reg [23:0] digits;
     reg [23:0] digits_next_tick;
     reg [15:0] alarm_digits;
@@ -77,7 +80,11 @@ module clock(
 
     wire k0_level = k0_sync[1];
     wire k1_level = k1_sync[1];
-    wire speaker_out = alarm_active ? alarm_tone : 1'b0;
+    wire alarm_start = alarm_enable && !alarm_active && alarm_check_pending && alarm_time_matches;
+    wire alarm_dismiss = alarm_active && qd_rise && qd_control_allowed;
+    wire alarm_second_beep = alarm_active && cp3_rise;
+    wire alarm_beep_running = (alarm_beep_ticks != 7'd0);
+    wire speaker_out = (alarm_active && alarm_beep_running) ? alarm_tone : 1'b0;
 
     function [7:0] inc_hour_pair;
         input [7:0] current;
@@ -228,6 +235,7 @@ module clock(
             alarm_active <= 1'b0;
             alarm_check_pending <= 1'b0;
             alarm_tone <= 1'b0;
+            alarm_beep_ticks <= 7'd0;
             digits <= 24'h000000;
             alarm_digits <= 16'h0000;
             cp3_sync <= 3'b000;
@@ -246,9 +254,17 @@ module clock(
             k2_sync <= {k2_sync[0], k2};
             k3_sync <= {k3_sync[0], k3};
 
-            if (alarm_active) begin
+            if (!alarm_enable || alarm_dismiss) begin
+                alarm_beep_ticks <= 7'd0;
+                alarm_tone <= 1'b0;
+            end else if (alarm_start || alarm_second_beep) begin
+                alarm_beep_ticks <= ALARM_BEEP_TICKS;
+                alarm_tone <= 1'b1;
+            end else if (alarm_active && alarm_beep_running) begin
+                alarm_beep_ticks <= alarm_beep_ticks - 7'd1;
                 alarm_tone <= ~alarm_tone;
             end else begin
+                alarm_beep_ticks <= 7'd0;
                 alarm_tone <= 1'b0;
             end
 
@@ -256,11 +272,9 @@ module clock(
 
             if (!alarm_enable) begin
                 alarm_active <= 1'b0;
-            end else if (alarm_active) begin
-                if (qd_rise && qd_control_allowed) begin
-                    alarm_active <= 1'b0;
-                end
-            end else if (alarm_check_pending && alarm_time_matches) begin
+            end else if (alarm_dismiss) begin
+                alarm_active <= 1'b0;
+            end else if (alarm_start) begin
                 alarm_active <= 1'b1;
             end
 
