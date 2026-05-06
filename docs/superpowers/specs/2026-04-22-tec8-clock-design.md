@@ -10,7 +10,7 @@ Implement a resource-conscious electronic clock with a single alarm feature for 
 - `LG2..LG6` expose 4-bit BCD outputs (`A` = LSB, `D` = MSB).
 - The seven-segment display is common cathode, so direct segment outputs are active high.
 - Required control signals are `CLR#`, `QD`, and `PULSE`.
-- From `实验五+六-预习.pdf`, `MF=1MHz`, `CP2=1KHz/100Hz`, and `CP3=10Hz/1Hz`.
+- From `实验五+六-预习.pdf`, `MF=1MHz`, `CP1=100KHz/10KHz`, `CP2=1KHz/100Hz`, and `CP3=10Hz/1Hz`.
 - Approved interaction:
   - `QD` toggles run/pause.
   - While paused, `PULSE` increments the selected field.
@@ -27,11 +27,11 @@ Implement a resource-conscious electronic clock with a single alarm feature for 
 - Use `CP2` as the single synchronous clock domain for the design.
 - Synchronize `CP3`, `QD`, `PULSE`, and `K0..K3` into the `CP2` domain.
 - Treat `CP3` only as a synchronized second-tick source.
-- Use `CP1` only for the alarm speaker tone divider; keep timekeeping and controls in the `CP2` domain.
+- Reuse `CP2` for the alarm speaker tone so the RTL no longer consumes the `CP1` input.
 - Recommended bench setup:
-  - `CP1` set to `100KHz` for an audible divided alarm tone
+  - `CP2` set to `1KHz` for responsive control sampling and an audible tone near `500Hz`
   - `CP3` set to `1Hz`
-  - `CP2` set to `1KHz` when possible for responsive control sampling
+  - `CP1` left unused
 - Keep the control path minimal:
   - asynchronous clear on `CLR#`
   - `QD` toggles a single `run_enable` bit
@@ -43,7 +43,7 @@ Implement a resource-conscious electronic clock with a single alarm feature for 
 - Alarm behavior:
   - trigger when current time reaches `alarm_hour:alarm_minute:00`
   - keep sounding until `QD` is pressed or `K3` is cleared
-  - use a small `CP1`-clocked divider to drive the speaker with a square wave instead of a constant level
+  - use a `CP2`-clocked tone flip-flop to drive the speaker with a square wave instead of a constant level
 
 ## Root Cause Notes
 

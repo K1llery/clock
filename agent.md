@@ -18,7 +18,7 @@ This repository contains the TEC-8 / `EPM7128SLC84-15` Verilog electronic clock 
   `2026数字课程设计 - verilog讲座-修订版.pdf` as the local Verilog checklist:
   - keep names meaningful and add comments only around state/control or non-obvious timing paths
   - keep RTL synthesizable; `initial`, delays, simulation-only constructs, division/modulo, and loops belong in testbenches, not `src/clock.v`
-  - keep register updates in the `CP2` synchronous domain unless a hardware reason requires otherwise; the current `CP1` exception is only the alarm speaker divider, with `alarm_active` synchronized into that domain
+  - keep register updates in the `CP2` synchronous domain unless a hardware reason requires otherwise; the alarm speaker tone now reuses the `CP2` domain
   - separate combinational next-value logic from sequential register updates; use blocking assignments in `always @(*)` / functions and non-blocking assignments in clocked blocks
   - use complete `case` / default assignments to avoid inferred latches and reduce priority-logic surprises
   - when timing reports point at a complex control path, prefer a small registered/pipelined check over deep same-cycle combinational matching
@@ -34,11 +34,11 @@ quartus_sh --flow compile clock
 
 ## Project-specific reminders
 
-- `CP2` is the main synchronous clock domain
-- `CP1` is used only as the alarm speaker tone source; prefer `100KHz` so the divider produces a sharper audible tone, currently about `3.125KHz`
+- `CP2` is the main synchronous clock domain and the alarm speaker tone source; prefer `1KHz`, which produces about a `500Hz` audible tone
+- `CP1` is not used by the RTL
 - `CP3` is the external timing tick source
 - Board issues are often caused by control gating or mode interaction, not just pin mismatches
-- If the alarm does not sound on hardware, check `K3=1`, an active `CP1` clock, the `PIN_52` speaker path, and whether the latest `clock.pof` was downloaded before changing RTL
+- If the alarm does not sound on hardware, check `K3=1`, an active `CP2` clock, the `PIN_52` speaker path, and whether the latest `clock.pof` was downloaded before changing RTL
 - Keep `README.md` updated when controls or operating procedures change
 
 ## TEC-8 physical hardware constraints
@@ -48,8 +48,8 @@ These constraints come from page 22 of `实验五+六-预习.pdf` and should be 
 - CPLD device: `EPM7128SLC84-15`
 - Main clock: `MF` on pin `55`, nominal `1MHz`
 - Auxiliary clocks:
-  - `CP1` on pin `56`: selectable `100KHz / 10KHz`
-  - `CP2` on pin `57`: selectable `1KHz / 100Hz`
+  - `CP1` on pin `56`: selectable `100KHz / 10KHz`, unused by this RTL
+  - `CP2` on pin `57`: selectable `1KHz / 100Hz`, used for synchronization and alarm tone generation
   - `CP3` on pin `58`: selectable `10Hz / 1Hz`
 - Board control pulses / reset:
   - `CLR#` on pin `1`: low-active reset signal; this RTL consumes it as `clr_n`

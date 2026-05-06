@@ -2,7 +2,6 @@
 
 module tb_clock;
 
-    reg cp1;
     reg cp2;
     reg cp3;
     reg clr_n;
@@ -12,7 +11,6 @@ module tb_clock;
     reg k1;
     reg k2;
     reg k3;
-    reg cp1_clock_enabled;
 
     wire lg1_d0;
     wire lg1_d1;
@@ -53,7 +51,6 @@ module tb_clock;
     reg previous_speaker_sample;
 
     clock dut (
-        .cp1(cp1),
         .cp2(cp2),
         .cp3(cp3),
         .clr_n(clr_n),
@@ -93,11 +90,6 @@ module tb_clock;
         .lg6_d(lg6_d)
     );
 
-    always #1 begin
-        if (cp1_clock_enabled) begin
-            cp1 = ~cp1;
-        end
-    end
     always #5 cp2 = ~cp2;
 
     task cp3_tick;
@@ -267,7 +259,6 @@ module tb_clock;
     endtask
 
     initial begin
-        cp1 = 1'b0;
         cp2 = 1'b0;
         cp3 = 1'b0;
         clr_n = 1'b1;
@@ -277,7 +268,6 @@ module tb_clock;
         k1 = 1'b0;
         k2 = 1'b0;
         k3 = 1'b0;
-        cp1_clock_enabled = 1'b1;
 
         #2 clr_n = 1'b0;
         #8 clr_n = 1'b1;
@@ -426,27 +416,25 @@ module tb_clock;
 
         sample_speaker_output(400);
         if (!saw_speaker_low || !saw_speaker_high) begin
-            $display("FAIL speaker output should be a CP1-derived square wave while alarm is active");
+            $display("FAIL speaker output should be a CP2-derived square wave while alarm is active");
             $finish;
         end
-        if ((speaker_transition_count < 20) || (speaker_transition_count > 30)) begin
-            $display("FAIL speaker output should use a higher audible tone near CP1/32 transitions=%0d",
+        if ((speaker_transition_count < 65) || (speaker_transition_count > 95)) begin
+            $display("FAIL speaker output should use a CP2-derived audible tone near CP2/2 transitions=%0d",
                 speaker_transition_count);
             $finish;
         end
 
-        cp1_clock_enabled = 1'b0;
         sample_speaker_output(120);
         if (dut.alarm_active !== 1'b1) begin
-            $display("FAIL stopping CP1 should not clear alarm_active");
+            $display("FAIL speaker sampling should not clear alarm_active");
             $finish;
         end
-        if (speaker_transition_count !== 0) begin
-            $display("FAIL stopped CP1 should not produce audible speaker transitions=%0d",
+        if ((speaker_transition_count < 20) || (speaker_transition_count > 30)) begin
+            $display("FAIL speaker should keep using CP2 with CP1 absent transitions=%0d",
                 speaker_transition_count);
             $finish;
         end
-        cp1_clock_enabled = 1'b1;
         wait_sync;
 
         qd_pulse;
