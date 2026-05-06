@@ -49,7 +49,7 @@ module clock(
     reg [6:0]  alarm_beep_ticks;
     reg [23:0] digits;
     reg [23:0] digits_next_tick;
-    reg [15:0] alarm_digits;
+    reg [23:0] alarm_digits;
 
     reg [2:0] cp3_sync;
     reg [2:0] qd_sync;
@@ -61,7 +61,7 @@ module clock(
 
     wire show_alarm = k2_sync[1];
     wire alarm_enable = k3_sync[1];
-    wire [23:0] shown_digits = show_alarm ? {alarm_digits, 8'h00} : digits;
+    wire [23:0] shown_digits = show_alarm ? alarm_digits : digits;
 
     wire [3:0] sec_ones  = shown_digits[3:0];
     wire [3:0] sec_tens  = shown_digits[7:4];
@@ -76,7 +76,7 @@ module clock(
     wire qd_rise = (qd_sync[2:1] == 2'b01);
     wire pulse_rise = (pulse_sync[2:1] == 2'b01);
     wire qd_control_allowed = !show_alarm;
-    wire alarm_time_matches = (digits[23:8] == alarm_digits);
+    wire alarm_time_matches = (digits == alarm_digits);
 
     wire k0_level = k0_sync[1];
     wire k1_level = k1_sync[1];
@@ -143,19 +143,26 @@ module clock(
         end
     endfunction
 
-    function [15:0] inc_alarm_hour;
-        input [15:0] current;
+    function [23:0] inc_alarm_hour;
+        input [23:0] current;
         reg [7:0] next_hour;
         begin
-            next_hour = inc_hour_pair(current[15:8]);
-            inc_alarm_hour = {next_hour, current[7:0]};
+            next_hour = inc_hour_pair(current[23:16]);
+            inc_alarm_hour = {next_hour, current[15:0]};
         end
     endfunction
 
-    function [15:0] inc_alarm_minute;
-        input [15:0] current;
+    function [23:0] inc_alarm_minute;
+        input [23:0] current;
         begin
-            inc_alarm_minute = inc_minute_pair(current);
+            inc_alarm_minute = {inc_minute_pair(current[23:8]), current[7:0]};
+        end
+    endfunction
+
+    function [23:0] inc_alarm_second;
+        input [23:0] current;
+        begin
+            inc_alarm_second = inc_second(current);
         end
     endfunction
 
@@ -237,7 +244,7 @@ module clock(
             alarm_tone <= 1'b0;
             alarm_beep_ticks <= 7'd0;
             digits <= 24'h000000;
-            alarm_digits <= 16'h0000;
+            alarm_digits <= 24'h000000;
             cp3_sync <= 3'b000;
             qd_sync <= 3'b000;
             pulse_sync <= 3'b000;
@@ -290,7 +297,7 @@ module clock(
                 if (cp3_rise) begin
                     digits <= digits_next_tick;
                     // Split alarm matching from the BCD carry path by one CP2 cycle.
-                    alarm_check_pending <= alarm_enable && !alarm_active && (digits_next_tick[7:0] == 8'h00);
+                    alarm_check_pending <= alarm_enable && !alarm_active;
                 end
             end else if (!alarm_active && pulse_rise) begin
                 if (show_alarm) begin
@@ -298,11 +305,15 @@ module clock(
                         alarm_digits <= inc_alarm_hour(alarm_digits);
                     end else if (k1_level) begin
                         alarm_digits <= inc_alarm_minute(alarm_digits);
+                    end else begin
+                        alarm_digits <= inc_alarm_second(alarm_digits);
                     end
                 end else if (k0_level) begin
                     digits <= inc_hour(digits);
                 end else if (k1_level) begin
                     digits <= inc_minute(digits);
+                end else begin
+                    digits <= inc_second(digits);
                 end
             end
         end
