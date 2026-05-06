@@ -77,4 +77,4 @@ quartus_sh --flow compile clock
 ## 编译结果
 
 - `Quartus` 输出编程文件：`clock.pof`
-- 资源占用：`117 / 128 macrocells`
+- 资源占用：`120 / 128 macrocells`
