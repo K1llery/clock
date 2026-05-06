@@ -59,6 +59,13 @@ If the user asks for a simple explanation, the plan can be shorter, but still in
 
 - Prefer minimal, targeted changes that preserve working behavior
 - Keep the stable single-clock synchronous structure unless the user explicitly wants an architectural rewrite
+- For RTL optimization work, use pages 29-33 of `2026数字课程设计 - verilog讲座-修订版.pdf` as the Verilog checklist:
+  - meaningful names and sparse comments for state/control or timing-sensitive paths
+  - synthesizable RTL only in `src/clock.v`; keep delays, `initial`, division/modulo, and other simulation-only constructs in `sim/tb_clock.v`
+  - CP2 remains the main register clock domain; CP1 is only for the alarm speaker divider and must receive CP2 control through synchronizers
+  - split combinational next-value calculation from sequential register updates; use blocking assignments for combinational logic and non-blocking assignments for clocked registers
+  - prefer complete `case` statements with defaults over long priority chains when it improves latch safety or timing clarity
+  - if Quartus reports a long control path, consider a small registered/pipelined check before adding more same-cycle combinational matching
 - If a bug is caused by control gating, asynchronous behavior, or mode interaction, fix the control flow first before adding new logic
 - Update the testbench whenever behavior changes
 - Update `README.md` when user-visible controls or procedures change

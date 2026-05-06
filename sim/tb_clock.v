@@ -117,6 +117,45 @@ module tb_clock;
         end
     endtask
 
+    task cp3_tick_to_alarm_boundary_with_pipeline_check;
+        begin
+            #9 cp3 = 1'b1;
+            @(posedge cp2);
+            @(posedge cp2);
+            @(posedge cp2);
+            #1;
+            if (dut.digits !== 24'h010200) begin
+                $display("FAIL alarm boundary pipeline expected time 01:02:00 got=%h", dut.digits);
+                $finish;
+            end
+            if (dut.alarm_check_pending !== 1'b1) begin
+                $display("FAIL alarm boundary should register a pending alarm check");
+                $finish;
+            end
+            if (dut.alarm_active !== 1'b0) begin
+                $display("FAIL alarm should wait one CP2 cycle after the minute boundary");
+                $finish;
+            end
+
+            @(posedge cp2);
+            #1;
+            if (dut.alarm_check_pending !== 1'b0) begin
+                $display("FAIL pending alarm check should clear after evaluation");
+                $finish;
+            end
+            if (dut.alarm_active !== 1'b1) begin
+                $display("FAIL pending alarm check should start the alarm");
+                $finish;
+            end
+
+            #2 cp3 = 1'b0;
+            @(posedge cp2);
+            @(posedge cp2);
+            @(posedge cp2);
+            #1;
+        end
+    endtask
+
     task wait_sync;
         begin
             #30;
@@ -322,7 +361,7 @@ module tb_clock;
             $finish;
         end
 
-        cp3_tick;
+        cp3_tick_to_alarm_boundary_with_pipeline_check;
         check_digits(24'h010200, "alarm trigger time");
         wait_sync;
         if (dut.alarm_active !== 1'b1) begin

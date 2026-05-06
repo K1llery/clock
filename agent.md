@@ -14,6 +14,14 @@ This repository contains the TEC-8 / `EPM7128SLC84-15` Verilog electronic clock 
   - `sim/tb_clock.v`
   - `clock.qsf`
 - Prefer short concrete plans before implementation
+- For RTL optimization requests, apply pages 29-33 of
+  `2026数字课程设计 - verilog讲座-修订版.pdf` as the local Verilog checklist:
+  - keep names meaningful and add comments only around state/control or non-obvious timing paths
+  - keep RTL synthesizable; `initial`, delays, simulation-only constructs, division/modulo, and loops belong in testbenches, not `src/clock.v`
+  - keep register updates in the `CP2` synchronous domain unless a hardware reason requires otherwise; the current `CP1` exception is only the alarm speaker divider, with `alarm_active` synchronized into that domain
+  - separate combinational next-value logic from sequential register updates; use blocking assignments in `always @(*)` / functions and non-blocking assignments in clocked blocks
+  - use complete `case` / default assignments to avoid inferred latches and reduce priority-logic surprises
+  - when timing reports point at a complex control path, prefer a small registered/pipelined check over deep same-cycle combinational matching
 - After RTL changes, run:
 
 ```powershell

@@ -43,9 +43,11 @@ module clock(
 
     reg        run_enable;
     reg        alarm_active;
+    reg        alarm_check_pending;
     reg [6:0]  alarm_tone_divider;
     reg [1:0]  alarm_active_cp1_sync;
     reg [23:0] digits;
+    reg [23:0] digits_next_tick;
     reg [15:0] alarm_digits;
 
     reg [2:0] cp3_sync;
@@ -73,6 +75,7 @@ module clock(
     wire qd_rise = (qd_sync[2:1] == 2'b01);
     wire pulse_rise = (pulse_sync[2:1] == 2'b01);
     wire qd_control_allowed = !show_alarm;
+    wire alarm_time_matches = (digits[23:8] == alarm_digits);
 
     wire k0_level = k0_sync[1];
     wire k1_level = k1_sync[1];
@@ -104,16 +107,7 @@ module clock(
         end
     endfunction
 
-    function [15:0] inc_alarm_hour;
-        input [15:0] current;
-        reg [7:0] next_hour;
-        begin
-            next_hour = inc_hour_pair(current[15:8]);
-            inc_alarm_hour = {next_hour, current[7:0]};
-        end
-    endfunction
-
-    function [15:0] inc_alarm_minute;
+    function [15:0] inc_minute_pair;
         input [15:0] current;
         reg [3:0] h_tens;
         reg [3:0] h_ones;
@@ -140,7 +134,23 @@ module clock(
                 m_ones = m_ones + 4'd1;
             end
 
-            inc_alarm_minute = {h_tens, h_ones, m_tens, m_ones};
+            inc_minute_pair = {h_tens, h_ones, m_tens, m_ones};
+        end
+    endfunction
+
+    function [15:0] inc_alarm_hour;
+        input [15:0] current;
+        reg [7:0] next_hour;
+        begin
+            next_hour = inc_hour_pair(current[15:8]);
+            inc_alarm_hour = {next_hour, current[7:0]};
+        end
+    endfunction
+
+    function [15:0] inc_alarm_minute;
+        input [15:0] current;
+        begin
+            inc_alarm_minute = inc_minute_pair(current);
         end
     endfunction
 
@@ -155,56 +165,39 @@ module clock(
 
     function [23:0] inc_minute;
         input [23:0] current;
-        reg [3:0] h_tens;
-        reg [3:0] h_ones;
-        reg [3:0] m_tens;
-        reg [3:0] m_ones;
-        reg [7:0] next_hour;
         begin
-            h_tens = current[23:20];
-            h_ones = current[19:16];
-            m_tens = current[15:12];
-            m_ones = current[11:8];
-            next_hour = 8'h00;
-
-            if ((m_tens == 4'd5) && (m_ones == 4'd9)) begin
-                m_tens = 4'd0;
-                m_ones = 4'd0;
-                next_hour = inc_hour_pair({h_tens, h_ones});
-                h_tens = next_hour[7:4];
-                h_ones = next_hour[3:0];
-            end else if (m_ones == 4'd9) begin
-                m_ones = 4'd0;
-                m_tens = m_tens + 4'd1;
-            end else begin
-                m_ones = m_ones + 4'd1;
-            end
-
-            inc_minute = {h_tens, h_ones, m_tens, m_ones, 8'h00};
+            inc_minute = {inc_minute_pair(current[23:8]), 8'h00};
         end
     endfunction
 
-    function alarm_match_after_tick;
-        input [23:0] current_time;
-        input [15:0] current_alarm;
+    function [23:0] inc_second;
+        input [23:0] current;
         reg [15:0] next_hhmm;
-        reg [7:0] next_hour;
+        reg [3:0] s_tens;
+        reg [3:0] s_ones;
         begin
-            next_hhmm = current_time[23:8];
-            next_hour = 8'h00;
+            next_hhmm = current[23:8];
+            s_tens = current[7:4];
+            s_ones = current[3:0];
 
-            if (current_time[7:0] == 8'h59) begin
-                if (current_time[15:8] == 8'h59) begin
-                    next_hour = inc_hour_pair(current_time[23:16]);
-                    next_hhmm = {next_hour, 8'h00};
-                end else if (current_time[11:8] == 4'd9) begin
-                    next_hhmm = {current_time[23:16], current_time[15:12] + 4'd1, 4'd0};
-                end else begin
-                    next_hhmm = {current_time[23:16], current_time[15:12], current_time[11:8] + 4'd1};
-                end
+            if (s_ones == 4'd9) begin
+                s_ones = 4'd0;
+                case (s_tens)
+                    4'd0: s_tens = 4'd1;
+                    4'd1: s_tens = 4'd2;
+                    4'd2: s_tens = 4'd3;
+                    4'd3: s_tens = 4'd4;
+                    4'd4: s_tens = 4'd5;
+                    default: begin
+                        s_tens = 4'd0;
+                        next_hhmm = inc_minute_pair(current[23:8]);
+                    end
+                endcase
+            end else begin
+                s_ones = s_ones + 4'd1;
             end
 
-            alarm_match_after_tick = (current_time[7:0] == 8'h59) && (next_hhmm == current_alarm);
+            inc_second = {next_hhmm, s_tens, s_ones};
         end
     endfunction
 
@@ -227,10 +220,15 @@ module clock(
         end
     endfunction
 
+    always @(*) begin
+        digits_next_tick = inc_second(digits);
+    end
+
     always @(negedge clr_n or posedge cp2) begin
         if (!clr_n) begin
             run_enable <= 1'b1;
             alarm_active <= 1'b0;
+            alarm_check_pending <= 1'b0;
             digits <= 24'h000000;
             alarm_digits <= 16'h0000;
             cp3_sync <= 3'b000;
@@ -249,12 +247,16 @@ module clock(
             k2_sync <= {k2_sync[0], k2};
             k3_sync <= {k3_sync[0], k3};
 
+            alarm_check_pending <= 1'b0;
+
             if (!alarm_enable) begin
                 alarm_active <= 1'b0;
             end else if (alarm_active) begin
                 if (qd_rise && qd_control_allowed) begin
                     alarm_active <= 1'b0;
                 end
+            end else if (alarm_check_pending && alarm_time_matches) begin
+                alarm_active <= 1'b1;
             end
 
             if (qd_rise && qd_control_allowed) begin
@@ -267,43 +269,9 @@ module clock(
 
             if (run_enable) begin
                 if (cp3_rise) begin
-                    if (alarm_enable && !alarm_active && alarm_match_after_tick(digits, alarm_digits)) begin
-                        alarm_active <= 1'b1;
-                    end
-
-                    if (digits[3:0] == 4'd9) begin
-                        digits[3:0] <= 4'd0;
-                        case (digits[7:4])
-                            4'd0: digits[7:4] <= 4'd1;
-                            4'd1: digits[7:4] <= 4'd2;
-                            4'd2: digits[7:4] <= 4'd3;
-                            4'd3: digits[7:4] <= 4'd4;
-                            4'd4: digits[7:4] <= 4'd5;
-                            default: begin
-                                digits[7:4] <= 4'd0;
-                                if ((digits[15:12] == 4'd5) && (digits[11:8] == 4'd9)) begin
-                                    digits[15:12] <= 4'd0;
-                                    digits[11:8] <= 4'd0;
-                                    if ((digits[23:20] == 4'd2) && (digits[19:16] == 4'd3)) begin
-                                        digits[23:20] <= 4'd0;
-                                        digits[19:16] <= 4'd0;
-                                    end else if (digits[19:16] == 4'd9) begin
-                                        digits[19:16] <= 4'd0;
-                                        digits[23:20] <= digits[23:20] + 4'd1;
-                                    end else begin
-                                        digits[19:16] <= digits[19:16] + 4'd1;
-                                    end
-                                end else if (digits[11:8] == 4'd9) begin
-                                    digits[11:8] <= 4'd0;
-                                    digits[15:12] <= digits[15:12] + 4'd1;
-                                end else begin
-                                    digits[11:8] <= digits[11:8] + 4'd1;
-                                end
-                            end
-                        endcase
-                    end else begin
-                        digits[3:0] <= digits[3:0] + 4'd1;
-                    end
+                    digits <= digits_next_tick;
+                    // Split alarm matching from the BCD carry path by one CP2 cycle.
+                    alarm_check_pending <= alarm_enable && !alarm_active && (digits_next_tick[7:0] == 8'h00);
                 end
             end else if (!alarm_active && pulse_rise) begin
                 if (show_alarm) begin
