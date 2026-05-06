@@ -119,23 +119,23 @@ module tb_clock;
         end
     endtask
 
-    task cp3_tick_to_alarm_boundary_with_pipeline_check;
+    task cp3_tick_to_alarm_match_with_pipeline_check;
         begin
             #9 cp3 = 1'b1;
             @(posedge cp2);
             @(posedge cp2);
             @(posedge cp2);
             #1;
-            if (dut.digits !== 24'h010200) begin
-                $display("FAIL alarm boundary pipeline expected time 01:02:00 got=%h", dut.digits);
+            if (dut.digits !== 24'h010201) begin
+                $display("FAIL alarm match pipeline expected time 01:02:01 got=%h", dut.digits);
                 $finish;
             end
             if (dut.alarm_check_pending !== 1'b1) begin
-                $display("FAIL alarm boundary should register a pending alarm check");
+                $display("FAIL alarm match should register a pending alarm check");
                 $finish;
             end
             if (dut.alarm_active !== 1'b0) begin
-                $display("FAIL alarm should wait one CP2 cycle after the minute boundary");
+                $display("FAIL alarm should wait one CP2 cycle after the matching second");
                 $finish;
             end
 
@@ -178,7 +178,7 @@ module tb_clock;
     endtask
 
     task check_alarm_digits;
-        input [15:0] expected;
+        input [23:0] expected;
         input [255:0] label;
         begin
             wait_sync;
@@ -301,11 +301,15 @@ module tb_clock;
         cp3_tick;
         check_digits(24'h000003, "paused clock must ignore cp3");
 
+        pulse_btn;
+        check_digits(24'h000004, "second adjust");
+        check_visible_seconds(4'd0, 4'd4, "second adjust visible seconds");
+
         k1 = 1'b1;
         pulse_btn;
-        check_digits(24'h000103, "minute adjust preserves seconds");
+        check_digits(24'h000104, "minute adjust preserves seconds");
         check_bcd_bus(4'd1, lg3_a, lg3_b, lg3_c, lg3_d, "minute ones");
-        check_visible_seconds(4'd0, 4'd3, "minute adjust keeps visible seconds");
+        check_visible_seconds(4'd0, 4'd4, "minute adjust keeps visible seconds");
         k1 = 1'b0;
 
         k0 = 1'b1;
@@ -326,13 +330,11 @@ module tb_clock;
         pulse_btn;
         pulse_btn;
         k1 = 1'b0;
-        check_alarm_digits(16'h0102, "alarm setting");
+        pulse_btn;
+        check_alarm_digits(24'h010201, "alarm setting");
         check_bcd_bus(4'd1, lg5_a, lg5_b, lg5_c, lg5_d, "alarm display hour ones");
         check_bcd_bus(4'd2, lg3_a, lg3_b, lg3_c, lg3_d, "alarm display minute ones");
-        if (dut.lg1_segments !== 7'b0111111) begin
-            $display("FAIL alarm display should force seconds to 00");
-            $finish;
-        end
+        check_visible_seconds(4'd0, 4'd1, "alarm display second adjust");
 
         qd_pulse;
         wait_sync;
@@ -364,16 +366,23 @@ module tb_clock;
             $finish;
         end
 
-        cp3_tick_to_alarm_boundary_with_pipeline_check;
-        check_digits(24'h010200, "alarm trigger time");
+        cp3_tick;
+        check_digits(24'h010200, "alarm should wait for adjusted second");
+        if (dut.alarm_active !== 1'b0) begin
+            $display("FAIL alarm should not trigger before adjusted second");
+            $finish;
+        end
+
+        cp3_tick_to_alarm_match_with_pipeline_check;
+        check_digits(24'h010201, "alarm trigger time");
         wait_sync;
         if (dut.alarm_active !== 1'b1) begin
-            $display("FAIL alarm should trigger at HH:MM:00");
+            $display("FAIL alarm should trigger at HH:MM:SS");
             $finish;
         end
 
         cp3_tick;
-        check_digits(24'h010201, "clock must keep running while alarm sounds");
+        check_digits(24'h010202, "clock must keep running while alarm sounds");
         if (dut.alarm_active !== 1'b1) begin
             $display("FAIL alarm should remain active while time keeps advancing");
             $finish;
@@ -416,7 +425,7 @@ module tb_clock;
             $finish;
         end
 
-        dut.digits = 24'h010159;
+        dut.digits = 24'h010200;
         wait_sync;
         cp3_tick;
         wait_sync;
@@ -437,7 +446,7 @@ module tb_clock;
         end
 
         cp3_tick;
-        check_digits(24'h010201, "clock must keep running with alarm disabled");
+        check_digits(24'h010202, "clock must keep running with alarm disabled");
 
         dut.digits = 24'h235958;
         wait_sync;
