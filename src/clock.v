@@ -166,7 +166,7 @@ module clock(
     function [23:0] inc_minute;
         input [23:0] current;
         begin
-            inc_minute = {inc_minute_pair(current[23:8]), 8'h00};
+            inc_minute = {inc_minute_pair(current[23:8]), current[7:0]};
         end
     endfunction
 

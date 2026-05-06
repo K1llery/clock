@@ -303,8 +303,9 @@ module tb_clock;
 
         k1 = 1'b1;
         pulse_btn;
-        check_digits(24'h000100, "minute adjust");
+        check_digits(24'h000103, "minute adjust preserves seconds");
         check_bcd_bus(4'd1, lg3_a, lg3_b, lg3_c, lg3_d, "minute ones");
+        check_visible_seconds(4'd0, 4'd3, "minute adjust keeps visible seconds");
         k1 = 1'b0;
 
         k0 = 1'b1;
