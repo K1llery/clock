@@ -338,7 +338,7 @@ module tb_clock;
 
         k0 = 1'b1;
         pulse_btn;
-        check_digits(24'h010100, "hour adjust");
+        check_digits(24'h010103, "hour adjust");
         check_bcd_bus(4'd1, lg5_a, lg5_b, lg5_c, lg5_d, "hour ones");
         k0 = 1'b0;
 
@@ -369,7 +369,7 @@ module tb_clock;
             $finish;
         end
         cp3_tick;
-        check_digits(24'h010100, "alarm setting must preserve paused time");
+        check_digits(24'h010103, "alarm setting must preserve paused time");
 
         k2 = 1'b0;
         wait_sync;

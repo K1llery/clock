@@ -159,7 +159,7 @@ module clock(
         reg [7:0] next_hour;
         begin
             next_hour = inc_hour_pair(current[23:16]);
-            inc_hour = {next_hour, current[15:8], 8'h00};
+            inc_hour = {next_hour, current[15:8], current[7:0]};
         end
     endfunction
 
