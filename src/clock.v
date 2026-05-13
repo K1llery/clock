@@ -40,14 +40,13 @@ module clock(
     output wire lg6_d
 );
 
-    parameter [6:0] ALARM_BEEP_TICKS = 7'd125;
+    parameter [6:0] BEEP_TICKS = 7'd125;
 
     reg        run_enable;
     reg        alarm_active;
     reg        alarm_check_pending;
-    reg        alarm_tone;
-    reg [6:0]  alarm_beep_ticks;
-    reg [8:0]  blink_counter;
+    reg [6:0]  beep_ticks;
+    reg        blink_phase;
     reg [23:0] digits;
     reg [23:0] digits_next_tick;
     reg [23:0] alarm_digits;
@@ -55,20 +54,19 @@ module clock(
     reg [2:0] cp3_sync;
     reg [2:0] qd_sync;
     reg [2:0] pulse_sync;
-    reg [1:0] k0_sync;
-    reg [1:0] k1_sync;
-    reg [1:0] k2_sync;
-    reg [1:0] k3_sync;
+    reg       k0_sync;
+    reg       k1_sync;
+    reg       k2_sync;
+    reg       k3_sync;
 
-    wire show_alarm = k2_sync[1];
-    wire alarm_enable = k3_sync[1];
+    wire show_alarm = k2_sync;
+    wire alarm_enable = k3_sync;
     wire [23:0] shown_digits = show_alarm ? alarm_digits : digits;
 
     wire adj_active = !run_enable && !alarm_active;
     wire adj_hour = adj_active && k0_level && !k1_level;
     wire adj_min  = adj_active && !k0_level && k1_level;
     wire adj_sec  = adj_active && !k0_level && !k1_level;
-    wire blink_phase = blink_counter[8];
     wire blank_hour = adj_hour && blink_phase;
     wire blank_min  = adj_min  && blink_phase;
     wire blank_sec  = adj_sec  && blink_phase;
@@ -94,13 +92,14 @@ module clock(
     wire qd_control_allowed = !show_alarm;
     wire alarm_time_matches = (digits == alarm_digits);
 
-    wire k0_level = k0_sync[1];
-    wire k1_level = k1_sync[1];
+    wire k0_level = k0_sync;
+    wire k1_level = k1_sync;
     wire alarm_start = alarm_enable && !alarm_active && alarm_check_pending && alarm_time_matches;
     wire alarm_dismiss = alarm_active && qd_rise && qd_control_allowed;
     wire alarm_second_beep = alarm_active && cp3_rise;
-    wire alarm_beep_running = (alarm_beep_ticks != 7'd0);
-    wire speaker_out = (alarm_active && alarm_beep_running) ? alarm_tone : 1'b0;
+    wire hourly_chime_start = alarm_check_pending && (digits[15:0] == 16'h0000);
+    wire beep_running = (beep_ticks != 7'd0);
+    wire speaker_out = beep_running ? beep_ticks[0] : 1'b0;
 
     function [7:0] inc_hour_pair;
         input [7:0] current;
@@ -257,39 +256,34 @@ module clock(
             run_enable <= 1'b1;
             alarm_active <= 1'b0;
             alarm_check_pending <= 1'b0;
-            alarm_tone <= 1'b0;
-            alarm_beep_ticks <= 7'd0;
-            blink_counter <= 9'd0;
+            beep_ticks <= 7'd0;
+            blink_phase <= 1'b0;
             digits <= 24'h000000;
             alarm_digits <= 24'h000000;
             cp3_sync <= 3'b000;
             qd_sync <= 3'b000;
             pulse_sync <= 3'b000;
-            k0_sync <= 2'b00;
-            k1_sync <= 2'b00;
-            k2_sync <= 2'b00;
-            k3_sync <= 2'b00;
+            k0_sync <= 1'b0;
+            k1_sync <= 1'b0;
+            k2_sync <= 1'b0;
+            k3_sync <= 1'b0;
         end else begin
             cp3_sync <= {cp3_sync[1:0], cp3};
             qd_sync <= {qd_sync[1:0], qd};
             pulse_sync <= {pulse_sync[1:0], pulse};
-            k0_sync <= {k0_sync[0], k0};
-            k1_sync <= {k1_sync[0], k1};
-            k2_sync <= {k2_sync[0], k2};
-            k3_sync <= {k3_sync[0], k3};
+            k0_sync <= k0;
+            k1_sync <= k1;
+            k2_sync <= k2;
+            k3_sync <= k3;
 
-            if (!alarm_enable || alarm_dismiss) begin
-                alarm_beep_ticks <= 7'd0;
-                alarm_tone <= 1'b0;
-            end else if (alarm_start || alarm_second_beep) begin
-                alarm_beep_ticks <= ALARM_BEEP_TICKS;
-                alarm_tone <= 1'b1;
-            end else if (alarm_active && alarm_beep_running) begin
-                alarm_beep_ticks <= alarm_beep_ticks - 7'd1;
-                alarm_tone <= ~alarm_tone;
+            if ((!alarm_enable && alarm_active) || alarm_dismiss) begin
+                beep_ticks <= 7'd0;
+            end else if (alarm_start || alarm_second_beep || hourly_chime_start) begin
+                beep_ticks <= BEEP_TICKS;
+            end else if (beep_running) begin
+                beep_ticks <= beep_ticks - 7'd1;
             end else begin
-                alarm_beep_ticks <= 7'd0;
-                alarm_tone <= 1'b0;
+                beep_ticks <= 7'd0;
             end
 
             alarm_check_pending <= 1'b0;
@@ -313,8 +307,8 @@ module clock(
             if (run_enable) begin
                 if (cp3_rise) begin
                     digits <= digits_next_tick;
-                    // Split alarm matching from the BCD carry path by one CP2 cycle.
-                    alarm_check_pending <= alarm_enable && !alarm_active;
+                    // Split time-based beep checks from the BCD carry path by one CP2 cycle.
+                    alarm_check_pending <= 1'b1;
                 end
             end else if (!alarm_active && pulse_rise) begin
                 if (show_alarm) begin
@@ -334,7 +328,9 @@ module clock(
                 end
             end
 
-            blink_counter <= blink_counter + 9'd1;
+            if (cp3_rise) begin
+                blink_phase <= ~blink_phase;
+            end
         end
     end
 

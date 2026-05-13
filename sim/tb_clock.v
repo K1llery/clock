@@ -304,7 +304,7 @@ module tb_clock;
         begin
             saw_normal = 1'b0;
             saw_blank = 1'b0;
-            for (i = 0; i < 512; i = i + 1) begin
+            for (i = 0; i < 64; i = i + 1) begin
                 @(posedge cp2);
                 #1;
                 case (lg_sel)
@@ -317,6 +317,24 @@ module tb_clock;
                 endcase
                 if (val == expected_val) saw_normal = 1'b1;
                 if (val == 4'hF) saw_blank = 1'b1;
+            end
+            if (should_blink && (!saw_normal || !saw_blank)) begin
+                cp3_tick;
+                wait_sync;
+                for (i = 0; i < 64; i = i + 1) begin
+                    @(posedge cp2);
+                    #1;
+                    case (lg_sel)
+                        3'd0: val = {lg2_d, lg2_c, lg2_b, lg2_a};
+                        3'd1: val = {lg3_d, lg3_c, lg3_b, lg3_a};
+                        3'd2: val = {lg4_d, lg4_c, lg4_b, lg4_a};
+                        3'd3: val = {lg5_d, lg5_c, lg5_b, lg5_a};
+                        3'd4: val = {lg6_d, lg6_c, lg6_b, lg6_a};
+                        default: val = 4'h0;
+                    endcase
+                    if (val == expected_val) saw_normal = 1'b1;
+                    if (val == 4'hF) saw_blank = 1'b1;
+                end
             end
             if (should_blink) begin
                 if (!saw_normal || !saw_blank) begin
@@ -345,12 +363,23 @@ module tb_clock;
         begin
             saw_normal = 1'b0;
             saw_blank = 1'b0;
-            for (i = 0; i < 512; i = i + 1) begin
+            for (i = 0; i < 64; i = i + 1) begin
                 @(posedge cp2);
                 #1;
                 segs = {lg1_d6, lg1_d5, lg1_d4, lg1_d3, lg1_d2, lg1_d1, lg1_d0};
                 if (segs == expected_seg) saw_normal = 1'b1;
                 if (segs == 7'b0000000) saw_blank = 1'b1;
+            end
+            if (should_blink && (!saw_normal || !saw_blank)) begin
+                cp3_tick;
+                wait_sync;
+                for (i = 0; i < 64; i = i + 1) begin
+                    @(posedge cp2);
+                    #1;
+                    segs = {lg1_d6, lg1_d5, lg1_d4, lg1_d3, lg1_d2, lg1_d1, lg1_d0};
+                    if (segs == expected_seg) saw_normal = 1'b1;
+                    if (segs == 7'b0000000) saw_blank = 1'b1;
+                end
             end
             if (should_blink) begin
                 if (!saw_normal || !saw_blank) begin
@@ -634,6 +663,35 @@ module tb_clock;
 
         cp3_tick;
         check_digits(24'h010202, "clock must keep running with alarm disabled");
+
+        dut.digits = 24'h015958;
+        wait_sync;
+        cp3_tick;
+        check_digits(24'h015959, "hourly chime pre-state");
+        sample_speaker_for_cp2_cycles(60);
+        if (speaker_transition_count !== 0) begin
+            $display("FAIL hourly chime should stay silent before the exact hour transitions=%0d",
+                speaker_transition_count);
+            $finish;
+        end
+
+        cp3_tick;
+        check_digits(24'h020000, "hourly chime trigger time");
+        sample_speaker_for_cp2_cycles(60);
+        if (!saw_speaker_low || !saw_speaker_high) begin
+            $display("FAIL hourly chime should start a short CP2-derived beep at HH:00:00");
+            $finish;
+        end
+        if ((speaker_transition_count < 45) || (speaker_transition_count > 65)) begin
+            $display("FAIL hourly chime should use the CP2-derived audible tone transitions=%0d",
+                speaker_transition_count);
+            $finish;
+        end
+        wait_cp2_cycles(90);
+        if (lg1_d7 !== 1'b0) begin
+            $display("FAIL hourly chime should rest low after the short beep");
+            $finish;
+        end
 
         dut.digits = 24'h235958;
         wait_sync;
