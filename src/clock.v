@@ -47,6 +47,7 @@ module clock(
     reg        alarm_check_pending;
     reg        alarm_tone;
     reg [6:0]  alarm_beep_ticks;
+    reg [8:0]  blink_counter;
     reg [23:0] digits;
     reg [23:0] digits_next_tick;
     reg [23:0] alarm_digits;
@@ -63,6 +64,15 @@ module clock(
     wire alarm_enable = k3_sync[1];
     wire [23:0] shown_digits = show_alarm ? alarm_digits : digits;
 
+    wire adj_active = !run_enable && !alarm_active;
+    wire adj_hour = adj_active && k0_level && !k1_level;
+    wire adj_min  = adj_active && !k0_level && k1_level;
+    wire adj_sec  = adj_active && !k0_level && !k1_level;
+    wire blink_phase = blink_counter[8];
+    wire blank_hour = adj_hour && blink_phase;
+    wire blank_min  = adj_min  && blink_phase;
+    wire blank_sec  = adj_sec  && blink_phase;
+
     wire [3:0] sec_ones  = shown_digits[3:0];
     wire [3:0] sec_tens  = shown_digits[7:4];
     wire [3:0] min_ones  = shown_digits[11:8];
@@ -70,7 +80,13 @@ module clock(
     wire [3:0] hour_ones = shown_digits[19:16];
     wire [3:0] hour_tens = shown_digits[23:20];
 
-    wire [6:0] lg1_segments = seg7_cc(sec_ones);
+    wire [6:0] lg1_segments = blank_sec ? 7'b0000000 : seg7_cc(sec_ones);
+
+    wire [3:0] disp_sec_tens  = blank_sec  ? 4'hF : sec_tens;
+    wire [3:0] disp_min_ones  = blank_min  ? 4'hF : min_ones;
+    wire [3:0] disp_min_tens  = blank_min  ? 4'hF : min_tens;
+    wire [3:0] disp_hour_ones = blank_hour ? 4'hF : hour_ones;
+    wire [3:0] disp_hour_tens = blank_hour ? 4'hF : hour_tens;
 
     wire cp3_rise = (cp3_sync[2:1] == 2'b01);
     wire qd_rise = (qd_sync[2:1] == 2'b01);
@@ -243,6 +259,7 @@ module clock(
             alarm_check_pending <= 1'b0;
             alarm_tone <= 1'b0;
             alarm_beep_ticks <= 7'd0;
+            blink_counter <= 9'd0;
             digits <= 24'h000000;
             alarm_digits <= 24'h000000;
             cp3_sync <= 3'b000;
@@ -316,6 +333,8 @@ module clock(
                     digits <= inc_second(digits);
                 end
             end
+
+            blink_counter <= blink_counter + 9'd1;
         end
     end
 
@@ -328,29 +347,29 @@ module clock(
     assign lg1_d6 = lg1_segments[6];
     assign lg1_d7 = speaker_out;
 
-    assign lg2_a = sec_tens[0];
-    assign lg2_b = sec_tens[1];
-    assign lg2_c = sec_tens[2];
-    assign lg2_d = sec_tens[3];
+    assign lg2_a = disp_sec_tens[0];
+    assign lg2_b = disp_sec_tens[1];
+    assign lg2_c = disp_sec_tens[2];
+    assign lg2_d = disp_sec_tens[3];
 
-    assign lg3_a = min_ones[0];
-    assign lg3_b = min_ones[1];
-    assign lg3_c = min_ones[2];
-    assign lg3_d = min_ones[3];
+    assign lg3_a = disp_min_ones[0];
+    assign lg3_b = disp_min_ones[1];
+    assign lg3_c = disp_min_ones[2];
+    assign lg3_d = disp_min_ones[3];
 
-    assign lg4_a = min_tens[0];
-    assign lg4_b = min_tens[1];
-    assign lg4_c = min_tens[2];
-    assign lg4_d = min_tens[3];
+    assign lg4_a = disp_min_tens[0];
+    assign lg4_b = disp_min_tens[1];
+    assign lg4_c = disp_min_tens[2];
+    assign lg4_d = disp_min_tens[3];
 
-    assign lg5_a = hour_ones[0];
-    assign lg5_b = hour_ones[1];
-    assign lg5_c = hour_ones[2];
-    assign lg5_d = hour_ones[3];
+    assign lg5_a = disp_hour_ones[0];
+    assign lg5_b = disp_hour_ones[1];
+    assign lg5_c = disp_hour_ones[2];
+    assign lg5_d = disp_hour_ones[3];
 
-    assign lg6_a = hour_tens[0];
-    assign lg6_b = hour_tens[1];
-    assign lg6_c = hour_tens[2];
-    assign lg6_d = hour_tens[3];
+    assign lg6_a = disp_hour_tens[0];
+    assign lg6_b = disp_hour_tens[1];
+    assign lg6_c = disp_hour_tens[2];
+    assign lg6_d = disp_hour_tens[3];
 
 endmodule

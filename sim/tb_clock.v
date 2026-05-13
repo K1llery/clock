@@ -292,6 +292,82 @@ module tb_clock;
         end
     endtask
 
+    task check_blink_bcd_lg;
+        input [3:0] expected_val;
+        input [2:0] lg_sel;
+        input should_blink;
+        input [255:0] label;
+        reg [3:0] val;
+        reg saw_normal;
+        reg saw_blank;
+        integer i;
+        begin
+            saw_normal = 1'b0;
+            saw_blank = 1'b0;
+            for (i = 0; i < 512; i = i + 1) begin
+                @(posedge cp2);
+                #1;
+                case (lg_sel)
+                    3'd0: val = {lg2_d, lg2_c, lg2_b, lg2_a};
+                    3'd1: val = {lg3_d, lg3_c, lg3_b, lg3_a};
+                    3'd2: val = {lg4_d, lg4_c, lg4_b, lg4_a};
+                    3'd3: val = {lg5_d, lg5_c, lg5_b, lg5_a};
+                    3'd4: val = {lg6_d, lg6_c, lg6_b, lg6_a};
+                    default: val = 4'h0;
+                endcase
+                if (val == expected_val) saw_normal = 1'b1;
+                if (val == 4'hF) saw_blank = 1'b1;
+            end
+            if (should_blink) begin
+                if (!saw_normal || !saw_blank) begin
+                    $display("FAIL %0s should blink expected=%0d saw_normal=%b saw_blank=%b",
+                        label, expected_val, saw_normal, saw_blank);
+                    $finish;
+                end
+            end else begin
+                if (saw_blank || !saw_normal) begin
+                    $display("FAIL %0s should not blink saw_normal=%b saw_blank=%b",
+                        label, saw_normal, saw_blank);
+                    $finish;
+                end
+            end
+        end
+    endtask
+
+    task check_blink_lg1;
+        input [6:0] expected_seg;
+        input should_blink;
+        input [255:0] label;
+        reg [6:0] segs;
+        reg saw_normal;
+        reg saw_blank;
+        integer i;
+        begin
+            saw_normal = 1'b0;
+            saw_blank = 1'b0;
+            for (i = 0; i < 512; i = i + 1) begin
+                @(posedge cp2);
+                #1;
+                segs = {lg1_d6, lg1_d5, lg1_d4, lg1_d3, lg1_d2, lg1_d1, lg1_d0};
+                if (segs == expected_seg) saw_normal = 1'b1;
+                if (segs == 7'b0000000) saw_blank = 1'b1;
+            end
+            if (should_blink) begin
+                if (!saw_normal || !saw_blank) begin
+                    $display("FAIL %0s should blink expected_seg=%b saw_normal=%b saw_blank=%b",
+                        label, expected_seg, saw_normal, saw_blank);
+                    $finish;
+                end
+            end else begin
+                if (saw_blank || !saw_normal) begin
+                    $display("FAIL %0s should not blink saw_normal=%b saw_blank=%b",
+                        label, saw_normal, saw_blank);
+                    $finish;
+                end
+            end
+        end
+    endtask
+
     initial begin
         cp2 = 1'b0;
         cp3 = 1'b0;
@@ -357,17 +433,40 @@ module tb_clock;
         check_digits(24'h000004, "second adjust");
         check_visible_seconds(4'd0, 4'd4, "second adjust visible seconds");
 
+        check_blink_lg1(expected_seg7(4'd4), 1'b1, "sec adjust lg1 blink");
+        check_blink_bcd_lg(4'd0, 3'd0, 1'b1, "sec adjust lg2 blink");
+        check_blink_bcd_lg(4'd0, 3'd1, 1'b0, "sec adjust lg3 no blink");
+        check_blink_bcd_lg(4'd0, 3'd2, 1'b0, "sec adjust lg4 no blink");
+        check_blink_bcd_lg(4'd0, 3'd3, 1'b0, "sec adjust lg5 no blink");
+        check_blink_bcd_lg(4'd0, 3'd4, 1'b0, "sec adjust lg6 no blink");
+
         k1 = 1'b1;
         pulse_btn;
         check_digits(24'h000104, "minute adjust preserves seconds");
         check_bcd_bus(4'd1, lg3_a, lg3_b, lg3_c, lg3_d, "minute ones");
         check_visible_seconds(4'd0, 4'd4, "minute adjust keeps visible seconds");
+
+        check_blink_lg1(expected_seg7(4'd4), 1'b0, "min adjust lg1 no blink");
+        check_blink_bcd_lg(4'd0, 3'd0, 1'b0, "min adjust lg2 no blink");
+        check_blink_bcd_lg(4'd1, 3'd1, 1'b1, "min adjust lg3 blink");
+        check_blink_bcd_lg(4'd0, 3'd2, 1'b1, "min adjust lg4 blink");
+        check_blink_bcd_lg(4'd0, 3'd3, 1'b0, "min adjust lg5 no blink");
+        check_blink_bcd_lg(4'd0, 3'd4, 1'b0, "min adjust lg6 no blink");
+
         k1 = 1'b0;
 
         k0 = 1'b1;
         pulse_btn;
-        check_digits(24'h010103, "hour adjust");
+        check_digits(24'h010104, "hour adjust");
         check_bcd_bus(4'd1, lg5_a, lg5_b, lg5_c, lg5_d, "hour ones");
+
+        check_blink_lg1(expected_seg7(4'd4), 1'b0, "hour adjust lg1 no blink");
+        check_blink_bcd_lg(4'd0, 3'd0, 1'b0, "hour adjust lg2 no blink");
+        check_blink_bcd_lg(4'd1, 3'd1, 1'b0, "hour adjust lg3 no blink");
+        check_blink_bcd_lg(4'd0, 3'd2, 1'b0, "hour adjust lg4 no blink");
+        check_blink_bcd_lg(4'd1, 3'd3, 1'b1, "hour adjust lg5 blink");
+        check_blink_bcd_lg(4'd0, 3'd4, 1'b1, "hour adjust lg6 blink");
+
         k0 = 1'b0;
 
         k2 = 1'b1;
@@ -388,6 +487,10 @@ module tb_clock;
         check_bcd_bus(4'd2, lg3_a, lg3_b, lg3_c, lg3_d, "alarm display minute ones");
         check_visible_seconds(4'd0, 4'd1, "alarm display second adjust");
 
+        check_blink_lg1(expected_seg7(4'd1), 1'b1, "alarm mode sec adjust lg1 blink");
+        check_blink_bcd_lg(4'd0, 3'd0, 1'b1, "alarm mode sec adjust lg2 blink");
+        check_blink_bcd_lg(4'd1, 3'd3, 1'b0, "alarm mode sec adjust lg5 no blink");
+
         qd_pulse;
         wait_sync;
         if (dut.run_enable !== 1'b0) begin
@@ -395,7 +498,7 @@ module tb_clock;
             $finish;
         end
         cp3_tick;
-        check_digits(24'h010103, "alarm setting must preserve paused time");
+        check_digits(24'h010104, "alarm setting must preserve paused time");
 
         k2 = 1'b0;
         wait_sync;
