@@ -122,7 +122,6 @@ module tb_clock;
             #9 cp3 = 1'b1;
             @(posedge cp2);
             @(posedge cp2);
-            @(posedge cp2);
             #1;
             if (dut.digits !== 24'h010201) begin
                 $display("FAIL alarm match pipeline expected time 01:02:01 got=%h", dut.digits);
@@ -531,6 +530,35 @@ module tb_clock;
 
         cp3_tick;
         check_digits(24'h010202, "clock must keep running with alarm disabled");
+
+        dut.digits = 24'h015958;
+        wait_sync;
+        cp3_tick;
+        check_digits(24'h015959, "hourly chime pre-state");
+        sample_speaker_for_cp2_cycles(60);
+        if (speaker_transition_count !== 0) begin
+            $display("FAIL hourly chime should stay silent before the exact hour transitions=%0d",
+                speaker_transition_count);
+            $finish;
+        end
+
+        cp3_tick;
+        check_digits(24'h020000, "hourly chime trigger time");
+        sample_speaker_for_cp2_cycles(60);
+        if (!saw_speaker_low || !saw_speaker_high) begin
+            $display("FAIL hourly chime should start a short CP2-derived beep at HH:00:00");
+            $finish;
+        end
+        if ((speaker_transition_count < 45) || (speaker_transition_count > 65)) begin
+            $display("FAIL hourly chime should use the CP2-derived audible tone transitions=%0d",
+                speaker_transition_count);
+            $finish;
+        end
+        wait_cp2_cycles(90);
+        if (lg1_d7 !== 1'b0) begin
+            $display("FAIL hourly chime should rest low after the short beep");
+            $finish;
+        end
 
         dut.digits = 24'h235958;
         wait_sync;
