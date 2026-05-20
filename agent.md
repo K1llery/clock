@@ -4,6 +4,21 @@ This repository contains the TEC-8 / `EPM7128SLC84-15` Verilog electronic clock 
 
 - [skills/clock-project-workflow/SKILL.md](/D:/clock/skills/clock-project-workflow/SKILL.md)
 
+## Current baseline
+
+- Branch: `main`
+- Core functions: `HH:MM:SS` clock, pause/set, full `HH:MM:SS` alarm, alarm dismiss, `K4` hourly chime switch, set-field blinking
+- Verified commands on the current baseline:
+
+```powershell
+iverilog -g2001 -o sim/tb_clock.vvp src/clock.v sim/tb_clock.v
+vvp sim/tb_clock.vvp
+quartus_sh --flow compile clock
+```
+
+- Latest fit result: `120 / 128 macrocells`, `42 / 68 pins`
+- Practical rule: this project has only 8 spare macrocells. Treat capacity as the first design constraint, and prefer changes that keep the fit at or below `124 / 128 macrocells`.
+
 ## Working defaults
 
 - Treat this repo as an engineering workflow, not just a code dump
@@ -14,6 +29,7 @@ This repository contains the TEC-8 / `EPM7128SLC84-15` Verilog electronic clock 
   - `sim/tb_clock.v`
   - `clock.qsf`
 - Prefer short concrete plans before implementation
+- If the request adds behavior, first name what will be removed, shared, or simplified to pay for it in macrocells
 - For RTL optimization requests, apply pages 29-33 of
   `2026数字课程设计 - verilog讲座-修订版.pdf` as the local Verilog checklist:
   - keep names meaningful and add comments only around state/control or non-obvious timing paths
@@ -37,9 +53,26 @@ quartus_sh --flow compile clock
 - `CP2` is the main synchronous clock domain and the alarm speaker tone source; prefer `1KHz`, which produces about a `500Hz` audible tone
 - `CP1` is not used by the RTL
 - `CP3` is the external timing tick source and drives the alarm's roughly one-second beep interval when set to `1Hz`
+- `K4` controls hourly chime. It is part of the current user interface; keep it documented with any control changes.
 - Board issues are often caused by control gating or mode interaction, not just pin mismatches
 - If the alarm does not sound on hardware, check `K3=1`, an active `CP2` clock, the `PIN_52` speaker path, and whether the latest `clock.pof` was downloaded before changing RTL
 - Keep `README.md` updated when controls or operating procedures change
+
+## Resource policy for future work
+
+- Do not reintroduce unfinished bidirectional setting / `K5` decrement logic by simply adding a second set of decrement functions. That style exceeded the device budget.
+- Before adding a feature, run or inspect Quartus and record the current macrocell count. After the feature, the fit must pass on `EPM7128SLC84-15`.
+- Good candidates under the current constraints:
+  - resource optimization of BCD increment paths and duplicated alarm/time setting paths
+  - synchronizing `K4` if hardware behavior requires it
+  - documentation, testbench, and board-checklist improvements
+- Risky candidates unless paired with optimization or feature removal:
+  - countdown mode
+  - multiple alarms
+  - long-press auto repeat
+  - bidirectional time setting
+  - richer speaker patterns
+- If a change fits only at `127 / 128` or `128 / 128`, call out the risk and prefer a smaller design. The board and Quartus fitter have little room for late fixes.
 
 ## TEC-8 physical hardware constraints
 

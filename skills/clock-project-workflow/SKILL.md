@@ -19,6 +19,17 @@ Use this skill when working on the `D:\clock` TEC-8 digital clock repository. Th
   - `README.md`
   - `docs/superpowers/specs/2026-04-22-tec8-clock-design.md`
 
+## Current hardware budget
+
+The current `main` baseline fits but is close to the edge:
+
+- Fitter result: `120 / 128 macrocells` on `EPM7128SLC84-15`
+- Pin result: `42 / 68 pins`
+- Simulation and Quartus compile pass on the current baseline
+- Only 8 macrocells remain; new behavior must be treated as a budgeted trade-off, not an additive default
+
+When a user asks for new functionality, first decide whether it can fit within this budget. Prefer designs that keep the final fit at or below `124 / 128 macrocells`, leaving at least 4 macrocells of repair margin.
+
 ## Use this workflow
 
 ### 1. Receive the request
@@ -29,6 +40,7 @@ Start by extracting the actual job to be done:
 - Is it a hardware bug, simulation mismatch, or board-level issue?
 - Does it affect RTL only, or also constraints, testbenches, and documentation?
 - Is the user asking for explanation only, or for code changes plus verification?
+- Is the request realistic with only 8 spare macrocells, or does it need optimization/removal first?
 
 If the user is continuing a prior task, assume they want end-to-end execution unless they explicitly ask for analysis only.
 
@@ -59,6 +71,9 @@ If the user asks for a simple explanation, the plan can be shorter, but still in
 
 - Prefer minimal, targeted changes that preserve working behavior
 - Keep the stable single-clock synchronous structure unless the user explicitly wants an architectural rewrite
+- Treat resource fit as a functional requirement. A feature that passes simulation but fails Quartus is not complete.
+- Do not re-add unfinished `K5` bidirectional setting by duplicating decrement logic for time and alarm fields. That approach is known to exceed the `EPM7128` budget. If direction control is requested, first reduce or share existing BCD update logic and prove the fit.
+- Avoid adding multiple alarms, countdown mode, long-press auto-repeat, or richer speaker patterns unless the plan also removes or simplifies enough logic to keep the design comfortably under 128 macrocells.
 - For RTL optimization work, use pages 29-33 of `2026数字课程设计 - verilog讲座-修订版.pdf` as the Verilog checklist:
   - meaningful names and sparse comments for state/control or timing-sensitive paths
   - synthesizable RTL only in `src/clock.v`; keep delays, `initial`, division/modulo, and other simulation-only constructs in `sim/tb_clock.v`
@@ -69,6 +84,24 @@ If the user asks for a simple explanation, the plan can be shorter, but still in
 - If a bug is caused by control gating, asynchronous behavior, or mode interaction, fix the control flow first before adding new logic
 - Update the testbench whenever behavior changes
 - Update `README.md` when user-visible controls or procedures change
+
+## Resource-conscious next work
+
+Good next steps for this repository:
+
+- Reduce duplicated BCD increment paths between current time and alarm setting.
+- Try replacing arithmetic-looking `+ 1` field updates with explicit BCD state transitions if Quartus keeps inferring expensive add/sub megafunctions.
+- Consider a shorter beep window if saving one counter bit is worth the audible trade-off.
+- Synchronize `K4` only if hardware behavior shows it is needed, then re-check macrocell count.
+- Improve testbench coverage, board setup notes, and troubleshooting docs; these add confidence without consuming CPLD resources.
+
+Treat these as poor fits for the current device unless paired with optimization:
+
+- multiple alarms
+- countdown timer
+- long-press repeat
+- bidirectional setting through `K5`
+- complex speaker melody or display effects
 
 ## Verification loop
 
