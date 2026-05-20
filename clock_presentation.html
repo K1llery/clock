@@ -1,0 +1,2758 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TEC-8 Verilog 电子钟 - 重新定义时间</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⌚</text></svg>">
+  <style>
+    :root {
+      --bg-color: #f5f5f7;
+      --card-bg: #ffffff;
+      --text-main: #1d1d1f;
+      --text-sub: #86868b;
+      --accent-blue: #0066cc;
+      --accent-blue-hover: #0077ed;
+      --accent-green: #34c759;
+      --border-color: rgba(0, 0, 0, 0.08);
+      --font-display: 'Outfit', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-body: 'Inter', 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', Consolas, Monaco, monospace;
+      --glass-bg: rgba(255, 255, 255, 0.8);
+      --glass-border: rgba(255, 255, 255, 0.4);
+      --shadow-sm: 0 2px 8px rgba(0,0,0,0.04);
+      --shadow-md: 0 8px 30px rgba(0,0,0,0.08);
+      --shadow-lg: 0 20px 40px rgba(0,0,0,0.12);
+      --transition-speed: 0.4s;
+    }
+
+    .dark-mode {
+      --bg-color: #000000;
+      --card-bg: #1d1d1f;
+      --text-main: #f5f5f7;
+      --text-sub: #86868b;
+      --accent-blue: #2997ff;
+      --accent-blue-hover: #47a6ff;
+      --border-color: rgba(255, 255, 255, 0.1);
+      --glass-bg: rgba(29, 29, 31, 0.8);
+      --glass-border: rgba(255, 255, 255, 0.05);
+      --shadow-sm: 0 2px 8px rgba(0,0,0,0.2);
+      --shadow-md: 0 8px 30px rgba(0,0,0,0.3);
+      --shadow-lg: 0 20px 40px rgba(0,0,0,0.5);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-body);
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      overflow-x: hidden;
+      transition: background-color var(--transition-speed), color var(--transition-speed);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Scrollbar Style */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg-color);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--text-sub);
+      border-radius: 4px;
+    }
+
+    /* Navigation Bar */
+    .navbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 48px;
+      backdrop-filter: blur(20px);
+      background: var(--glass-bg);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 24px;
+      z-index: 1000;
+      transition: background-color var(--transition-speed), border-color var(--transition-speed);
+    }
+
+    .nav-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .nav-logo {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 18px;
+      color: var(--text-main);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .nav-logo svg {
+      width: 20px;
+      height: 20px;
+      fill: currentColor;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 24px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--text-sub);
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover {
+      color: var(--text-main);
+    }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .btn-toggle-mode, .btn-theme {
+      background: var(--text-main);
+      color: var(--bg-color);
+      border: none;
+      padding: 6px 14px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-toggle-mode:hover, .btn-theme:hover {
+      opacity: 0.9;
+      transform: scale(1.02);
+    }
+
+    .btn-theme {
+      background: transparent;
+      border: 1px solid var(--text-main);
+      color: var(--text-main);
+    }
+
+    /* Sub-nav / Secondary Nav */
+    .subnav {
+      position: fixed;
+      top: 48px;
+      left: 0;
+      right: 0;
+      height: 52px;
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 40px;
+      z-index: 999;
+      transition: background-color var(--transition-speed);
+    }
+
+    .subnav-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .subnav-links {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .subnav-links span {
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+
+    .btn-primary {
+      background: var(--accent-blue);
+      color: #ffffff;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background-color 0.2s;
+    }
+
+    .btn-primary:hover {
+      background-color: var(--accent-blue-hover);
+    }
+
+    /* Top blue discount banner (Apple style) */
+    .promo-banner {
+      margin-top: 100px;
+      background-color: #f5f5f7;
+      color: #1d1d1f;
+      text-align: center;
+      padding: 12px 20px;
+      font-size: 11px;
+      font-weight: 400;
+      border-bottom: 1px solid rgba(0,0,0,0.05);
+    }
+
+    .dark-mode .promo-banner {
+      background-color: #1d1d1f;
+      color: #f5f5f7;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .promo-banner a {
+      color: var(--accent-blue);
+      text-decoration: none;
+    }
+    .promo-banner a:hover {
+      text-decoration: underline;
+    }
+
+    /* VIEWS */
+    #product-view {
+      display: block;
+    }
+
+    #slideshow-view {
+      display: none;
+      position: fixed;
+      top: 100px;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--bg-color);
+      z-index: 900;
+    }
+
+    /* PRODUCT VIEW DESIGN */
+    .hero-section {
+      text-align: center;
+      padding: 60px 20px 40px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .hero-title {
+      font-family: var(--font-display);
+      font-size: 72px;
+      font-weight: 800;
+      letter-spacing: -2px;
+      margin-bottom: 8px;
+    }
+
+    .hero-subtitle {
+      font-size: 24px;
+      color: var(--text-sub);
+      font-weight: 400;
+      margin-bottom: 24px;
+      letter-spacing: -0.5px;
+    }
+
+    .hero-ctas {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 48px;
+    }
+
+    .btn-hero-primary {
+      background: var(--accent-blue);
+      color: white;
+      padding: 12px 28px;
+      border-radius: 30px;
+      font-size: 16px;
+      font-weight: 500;
+      text-decoration: none;
+      transition: opacity 0.2s;
+    }
+    .btn-hero-primary:hover {
+      opacity: 0.9;
+    }
+    .btn-hero-secondary {
+      color: var(--accent-blue);
+      padding: 12px 28px;
+      font-size: 16px;
+      font-weight: 500;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .btn-hero-secondary:hover {
+      text-decoration: underline;
+    }
+
+    /* Cards Grid (Apple Watch Style) */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 24px;
+      padding: 0 40px 60px;
+      max-width: 1300px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 28px;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 520px;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      overflow: hidden;
+      position: relative;
+      border: 1px solid var(--border-color);
+    }
+
+    .card:hover {
+      transform: translateY(-6px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .card-label {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--accent-blue);
+      margin-bottom: 8px;
+    }
+
+    .card-title {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      line-height: 1.2;
+    }
+
+    .card-desc {
+      font-size: 14px;
+      color: var(--text-sub);
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+
+    .card-illustration {
+      flex-grow: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+      position: relative;
+    }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-top: 1px solid var(--border-color);
+      padding-top: 20px;
+    }
+
+    .card-price {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .card-price span {
+      display: block;
+      font-size: 11px;
+      color: var(--text-sub);
+      font-weight: 400;
+    }
+
+    .card-btn {
+      background: var(--accent-blue);
+      color: white;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    /* SIMULATOR CONTAINER (SPLIT SCREEN) */
+    .simulator-container {
+      max-width: 1200px;
+      margin: 40px auto 80px;
+      padding: 0 20px;
+    }
+
+    .simulator-title-block {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .simulator-title-block h2 {
+      font-family: var(--font-display);
+      font-size: 40px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .simulator-title-block p {
+      color: var(--text-sub);
+      font-size: 16px;
+    }
+
+    .sim-layout {
+      background: var(--card-bg);
+      border-radius: 32px;
+      border: 1px solid var(--border-color);
+      box-shadow: var(--shadow-lg);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      min-height: 580px;
+      overflow: hidden;
+    }
+
+    @media (max-width: 900px) {
+      .sim-layout {
+        grid-template-columns: 1fr;
+      }
+      .hero-title {
+        font-size: 48px;
+      }
+      .cards-grid {
+        padding: 0 20px 40px;
+      }
+    }
+
+    /* Left Panel: The simulated watch hardware */
+    .sim-panel-hardware {
+      background: radial-gradient(circle at center, #2c2c2e 0%, #1c1c1e 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+      color: #ffffff;
+      position: relative;
+    }
+
+    /* Apple Watch mockup shell */
+    .virtual-watch {
+      width: 280px;
+      height: 340px;
+      background: #000000;
+      border-radius: 56px;
+      border: 8px solid #3a3a3c;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), inset 0 0 10px rgba(255,255,255,0.1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 30px 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .virtual-watch::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 50%;
+      background: linear-gradient(to bottom, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0) 100%);
+      pointer-events: none;
+    }
+
+    /* Digital crown and side button mockups on right of casing */
+    .watch-crown {
+      position: absolute;
+      right: -13px;
+      top: 80px;
+      width: 10px;
+      height: 60px;
+      background: linear-gradient(to bottom, #555, #222, #555);
+      border-radius: 4px;
+      border-left: 2px solid #999;
+    }
+
+    .watch-side-btn {
+      position: absolute;
+      right: -11px;
+      top: 160px;
+      width: 6px;
+      height: 48px;
+      background: #2c2c2e;
+      border-radius: 3px;
+      border-left: 1px solid #555;
+    }
+
+    /* Screen display elements */
+    .watch-header {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: #8e8e93;
+      font-weight: 600;
+      padding: 0 10px;
+    }
+
+    .watch-status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-green);
+    }
+    .watch-status-dot.paused {
+      background: #ff9500;
+    }
+    .watch-status-dot.alarm-sounding {
+      background: #ff3b30;
+      animation: pulse-red 0.5s infinite alternate;
+    }
+
+    @keyframes pulse-red {
+      0% { transform: scale(1); opacity: 0.8; }
+      100% { transform: scale(1.4); opacity: 1; }
+    }
+
+    .watch-face {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin-top: 15px;
+    }
+
+    .watch-face-mode {
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #ff9500;
+      margin-bottom: 8px;
+      height: 12px;
+    }
+
+    /* 6 Digits segmented look */
+    .digits-display {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 34px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      background: #1c1c1e;
+      padding: 16px 20px;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.05);
+      color: #ffffff;
+      box-shadow: inset 0 2px 10px rgba(0,0,0,0.8);
+      position: relative;
+    }
+
+    .digit-group {
+      display: flex;
+      align-items: center;
+    }
+
+    .digit-colon {
+      animation: blink-colon 1s infinite steps(1, start);
+      color: rgba(255, 255, 255, 0.8);
+      margin: 0 4px;
+    }
+    .digit-colon.frozen {
+      animation: none;
+    }
+
+    @keyframes blink-colon {
+      0%, 100% { opacity: 0; }
+      50% { opacity: 1; }
+    }
+
+    .digit-val {
+      width: 22px;
+      text-align: center;
+    }
+
+    .digit-val.blink-off {
+      opacity: 0.15;
+    }
+
+    .watch-indicators {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 0 10px;
+    }
+
+    .indicator-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: #8e8e93;
+    }
+
+    .indicator-row span.active {
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    .speaker-visualizer {
+      width: 100%;
+      height: 14px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 3px;
+      margin-top: 10px;
+    }
+
+    .speaker-bar {
+      width: 3px;
+      height: 4px;
+      background: #8e8e93;
+      border-radius: 1px;
+      transition: height 0.1s;
+    }
+
+    .speaker-visualizer.active .speaker-bar {
+      background: #ff3b30;
+      animation: speak-bounce 0.1s infinite alternate;
+    }
+    .speaker-visualizer.active .speaker-bar:nth-child(1) { animation-delay: 0.02s; }
+    .speaker-visualizer.active .speaker-bar:nth-child(2) { animation-delay: 0.05s; }
+    .speaker-visualizer.active .speaker-bar:nth-child(3) { animation-delay: 0.08s; }
+    .speaker-visualizer.active .speaker-bar:nth-child(4) { animation-delay: 0.03s; }
+    .speaker-visualizer.active .speaker-bar:nth-child(5) { animation-delay: 0.01s; }
+
+    @keyframes speak-bounce {
+      0% { height: 4px; }
+      100% { height: 14px; }
+    }
+
+    /* Right Panel: Controls layout */
+    .sim-panel-controls {
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .control-header h3 {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .control-header p {
+      color: var(--text-sub);
+      font-size: 13px;
+      margin-bottom: 24px;
+    }
+
+    .control-group {
+      margin-bottom: 24px;
+    }
+
+    .control-group-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-sub);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* Toggle switches */
+    .switches-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .switch-wrapper {
+      background: var(--bg-color);
+      border: 1px solid var(--border-color);
+      padding: 12px 16px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .switch-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .switch-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+    .switch-desc {
+      font-size: 10px;
+      color: var(--text-sub);
+      margin-top: 2px;
+    }
+
+    /* CSS Switch Toggle */
+    .switch-pill {
+      width: 36px;
+      height: 20px;
+      background-color: #cbd5e1;
+      border-radius: 10px;
+      position: relative;
+      transition: background-color 0.2s;
+    }
+    .dark-mode .switch-pill {
+      background-color: #475569;
+    }
+
+    .switch-pill::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 16px;
+      height: 16px;
+      background-color: white;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+
+    .switch-wrapper.active .switch-pill {
+      background-color: var(--accent-green);
+    }
+    .switch-wrapper.active .switch-pill::after {
+      transform: translateX(16px);
+    }
+
+    /* Buttons block */
+    .buttons-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .btn-tactile {
+      background: var(--bg-color);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 16px;
+      border-radius: 16px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.1s;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+      user-select: none;
+    }
+
+    .btn-tactile:active {
+      transform: scale(0.95);
+      background-color: var(--border-color);
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .btn-tactile.highlight {
+      background: var(--accent-blue);
+      color: #ffffff;
+      border-color: transparent;
+    }
+    .btn-tactile.highlight:active {
+      background: var(--accent-blue-hover);
+    }
+
+    .speed-control {
+      background: var(--bg-color);
+      border: 1px solid var(--border-color);
+      padding: 14px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .speed-btns {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-speed {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-speed.active {
+      background: var(--text-main);
+      color: var(--bg-color);
+      border-color: transparent;
+    }
+
+    /* CODE & SPECIFICATION VIEW */
+    .details-section {
+      max-width: 1200px;
+      margin: 0 auto 100px;
+      padding: 0 20px;
+    }
+
+    .details-tabs {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 30px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 15px;
+    }
+
+    .tab-btn {
+      background: none;
+      border: none;
+      color: var(--text-sub);
+      font-size: 16px;
+      font-weight: 600;
+      padding: 8px 24px;
+      cursor: pointer;
+      position: relative;
+      transition: color 0.2s;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+    }
+
+    .tab-btn.active {
+      color: var(--text-main);
+    }
+
+    .tab-btn.active::after {
+      content: '';
+      position: absolute;
+      bottom: -16px;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--text-main);
+      border-radius: 2px;
+    }
+
+    .tab-pane {
+      display: none;
+      background: var(--card-bg);
+      border-radius: 28px;
+      padding: 40px;
+      border: 1px solid var(--border-color);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .tab-pane.active {
+      display: block;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Design Specs Details styling */
+    .specs-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 40px;
+    }
+
+    @media (max-width: 800px) {
+      .specs-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .specs-text h3 {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+    .specs-text p {
+      color: var(--text-sub);
+      line-height: 1.6;
+      margin-bottom: 20px;
+      font-size: 15px;
+    }
+
+    .specs-list {
+      list-style: none;
+    }
+
+    .specs-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 16px;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .specs-list li svg {
+      width: 18px;
+      height: 18px;
+      fill: var(--accent-green);
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .specs-table-wrapper {
+      background: var(--bg-color);
+      border-radius: 20px;
+      padding: 24px;
+      border: 1px solid var(--border-color);
+    }
+
+    .specs-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .specs-table th, .specs-table td {
+      padding: 12px 16px;
+      text-align: left;
+      font-size: 13px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .specs-table th {
+      color: var(--text-sub);
+      font-weight: 600;
+    }
+    .specs-table td {
+      color: var(--text-main);
+      font-weight: 500;
+    }
+
+    .specs-table tr:last-child th, .specs-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .alert-banner {
+      background: rgba(255, 149, 0, 0.08);
+      border-left: 4px solid #ff9500;
+      padding: 16px 20px;
+      border-radius: 12px;
+      margin-bottom: 24px;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    .alert-banner-title {
+      font-weight: 700;
+      color: #ff9500;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+    .alert-banner-text {
+      font-size: 12px;
+      color: var(--text-main);
+      line-height: 1.4;
+    }
+
+    /* CODE PREVIEW */
+    .code-viewer-layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 30px;
+      min-height: 500px;
+    }
+
+    @media (max-width: 800px) {
+      .code-viewer-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .code-nav {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .code-nav-btn {
+      width: 100%;
+      background: none;
+      border: 1px solid transparent;
+      color: var(--text-sub);
+      padding: 14px 20px;
+      text-align: left;
+      border-radius: 14px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .code-nav-btn:hover {
+      color: var(--text-main);
+      background: var(--bg-color);
+    }
+
+    .code-nav-btn.active {
+      color: var(--text-main);
+      background: var(--bg-color);
+      border-color: var(--border-color);
+    }
+
+    .code-content-wrapper {
+      position: relative;
+      background: #1e1e1e;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.5);
+    }
+
+    .code-content-header {
+      background: #2d2d2d;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #3d3d3d;
+    }
+
+    .code-filename {
+      color: #9cdcfe;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    .code-controls {
+      display: flex;
+      gap: 6px;
+    }
+
+    .code-control-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    .code-control-dot.red { background: #ff5f56; }
+    .code-control-dot.yellow { background: #ffbd2e; }
+    .code-control-dot.green { background: #27c93f; }
+
+    .code-pre-scroll {
+      padding: 24px;
+      overflow: auto;
+      max-height: 480px;
+      margin: 0;
+    }
+
+    .code-block {
+      color: #d4d4d4;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.5;
+      white-space: pre;
+    }
+
+    /* Keyword highlight styling */
+    .c-kw { color: #569cd6; font-weight: 500; } /* keyword */
+    .c-cm { color: #6a9955; } /* comment */
+    .c-st { color: #ce9178; } /* string */
+    .c-num { color: #b5cea8; } /* number */
+    .c-fn { color: #dcdcaa; } /* function/module */
+    .c-var { color: #9cdcfe; } /* variable/wire */
+
+    /* WAVEFORM SECTION */
+    .waveform-title {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+    .waveform-desc {
+      color: var(--text-sub);
+      font-size: 14px;
+      line-height: 1.5;
+      margin-bottom: 30px;
+    }
+
+    .waveform-svg-wrapper {
+      background: #111111;
+      border-radius: 20px;
+      padding: 30px;
+      overflow-x: auto;
+      border: 1px solid rgba(255,255,255,0.05);
+      box-shadow: inset 0 4px 20px rgba(0,0,0,0.8);
+    }
+
+    .waveform-svg {
+      min-width: 800px;
+      display: block;
+      width: 100%;
+    }
+
+    /* SLIDESHOW VIEW DESIGN */
+    .slide-deck {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .slides-container {
+      flex-grow: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .slide {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      visibility: hidden;
+      transform: scale(0.98) translateX(20px);
+      transition: opacity 0.5s cubic-bezier(0.25, 1, 0.5, 1), transform 0.5s cubic-bezier(0.25, 1, 0.5, 1), visibility 0.5s;
+      padding: 60px 80px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      overflow-y: auto;
+    }
+
+    .slide.active {
+      opacity: 1;
+      visibility: visible;
+      transform: scale(1) translateX(0);
+    }
+
+    .slide.prev-slide {
+      transform: scale(0.98) translateX(-20px);
+    }
+
+    .slide-title-area {
+      margin-bottom: 40px;
+    }
+
+    .slide-tag {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--accent-blue);
+      margin-bottom: 8px;
+    }
+
+    .slide-title {
+      font-family: var(--font-display);
+      font-size: 48px;
+      font-weight: 800;
+      letter-spacing: -1px;
+    }
+
+    .slide-content-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+      align-items: center;
+    }
+
+    @media (max-width: 850px) {
+      .slide-content-grid {
+        grid-template-columns: 1fr;
+        gap: 30px;
+      }
+      .slide {
+        padding: 40px 30px;
+      }
+      .slide-title {
+        font-size: 32px;
+      }
+    }
+
+    .slide-text-pane p {
+      font-size: 18px;
+      line-height: 1.6;
+      color: var(--text-sub);
+      margin-bottom: 24px;
+    }
+
+    .slide-text-pane ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .slide-text-pane li {
+      font-size: 16px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .slide-text-pane li::before {
+      content: "•";
+      color: var(--accent-blue);
+      font-size: 24px;
+      line-height: 0;
+    }
+
+    .slide-media-pane {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* Giant text slide style */
+    .slide-center-layout {
+      max-width: 800px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .slide-quote {
+      font-size: 32px;
+      font-weight: 300;
+      line-height: 1.4;
+      margin-bottom: 30px;
+      font-style: italic;
+    }
+
+    /* Slideshow Bottom Bar Control */
+    .slide-controls-bar {
+      height: 64px;
+      background: var(--card-bg);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 40px;
+      z-index: 10;
+      transition: background-color var(--transition-speed);
+    }
+
+    .slide-nav-btns {
+      display: flex;
+      gap: 16px;
+    }
+
+    .btn-slide-nav {
+      background: var(--bg-color);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.2s;
+    }
+
+    .btn-slide-nav:hover {
+      background: var(--border-color);
+    }
+
+    .slide-progress-dots {
+      display: flex;
+      gap: 8px;
+    }
+
+    .slide-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--border-color);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .slide-dot.active {
+      background: var(--text-main);
+      transform: scale(1.3);
+    }
+
+    .slide-page-num {
+      font-size: 13px;
+      color: var(--text-sub);
+      font-weight: 500;
+    }
+
+    /* FOOTER */
+    .footer {
+      background: var(--card-bg);
+      border-top: 1px solid var(--border-color);
+      padding: 60px 40px 40px;
+      text-align: center;
+      transition: background-color var(--transition-speed);
+    }
+
+    .footer-content {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .footer-logo {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 24px;
+      color: var(--text-main);
+      margin-bottom: 20px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      margin-bottom: 30px;
+      list-style: none;
+    }
+
+    .footer-links a {
+      color: var(--text-sub);
+      text-decoration: none;
+      font-size: 13px;
+      transition: color 0.2s;
+    }
+
+    .footer-links a:hover {
+      color: var(--text-main);
+    }
+
+    .footer-copyright {
+      font-size: 11px;
+      color: var(--text-sub);
+    }
+
+    /* Code highlights inside slides */
+    .slide-code-box {
+      background: #111111;
+      border-radius: 16px;
+      padding: 20px;
+      color: #e4e4e4;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.4;
+      text-align: left;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid rgba(255,255,255,0.05);
+      width: 100%;
+    }
+
+    /* Slide specific styles */
+    .slide-card {
+      background: var(--card-bg);
+      border-radius: 20px;
+      padding: 30px;
+      border: 1px solid var(--border-color);
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* Key visual styles */
+    .sim-waveform-box {
+      width: 100%;
+      height: 200px;
+      background: #1a1a1a;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #777;
+      font-family: var(--font-mono);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <nav class="navbar">
+    <div class="nav-left">
+      <a href="#" class="nav-logo">
+        <svg viewBox="0 0 24 24">
+          <rect x="5" y="2" width="14" height="20" rx="4" fill="none" stroke="currentColor" stroke-width="2"/>
+          <circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="12" y1="2" x2="12" y2="5" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="12" y1="19" x2="12" y2="22" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+        TEC-8 Digital Clock
+      </a>
+      <ul class="nav-links">
+        <li><a href="#product-view" onclick="setViewMode('product')">项目首页</a></li>
+        <li><a href="#simulator-section">交互模拟器</a></li>
+        <li><a href="#details-section">硬件与代码</a></li>
+      </ul>
+    </div>
+    <div class="nav-right">
+      <button class="btn-theme" id="theme-btn" onclick="toggleDarkMode()">深色模式</button>
+      <button class="btn-toggle-mode" id="view-mode-btn" onclick="toggleViewMode()">演示 PPT 模式</button>
+    </div>
+  </nav>
+
+  <!-- Sub navigation -->
+  <div class="subnav">
+    <div class="subnav-title">Verilog 电子钟</div>
+    <div class="subnav-links">
+      <span>EPM7128 CPLD 平台</span>
+      <span>同步时钟架构</span>
+      <a href="#simulator-section" class="btn-primary">立即体验模拟</a>
+    </div>
+  </div>
+
+  <!-- Blue Promo Bar -->
+  <div class="promo-banner">
+    正在查看 TEC-8 / CPLD 硬件电子钟项目设计介绍。您也可以切换到 <a href="#" onclick="toggleViewMode(); return false;">全屏幻灯片 (PPT) 演示模式</a> 以便做学术汇报。
+  </div>
+
+  <!-- VIEW 1: PRODUCT PAGE (SCROLLING WEB PAGE) -->
+  <div id="product-view">
+    <section class="hero-section">
+      <h1 class="hero-title">重新定义时间</h1>
+      <p class="hero-subtitle">基于 Verilog 与 CPLD 的高可靠全同步电子钟架构</p>
+      <div class="hero-ctas">
+        <a href="#simulator-section" class="btn-hero-primary">控制面板模拟</a>
+        <a href="#details-section" class="btn-hero-secondary">
+          阅读技术说明
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </a>
+      </div>
+    </section>
+
+    <!-- Core Features Cards (Apple Watch Style cards grid) -->
+    <section class="cards-grid">
+      <!-- Card 1: Resource fit -->
+      <div class="card">
+        <div>
+          <div class="card-label">极致能效与拟合</div>
+          <h2 class="card-title">戴着镣铐跳舞</h2>
+          <p class="card-desc">针对低容量的 EPM7128SLC84 芯片进行了极限资源优化，仅占用 120/128 个宏单元 (94%)，在狭小的物理底盘中构建出多功能系统。</p>
+        </div>
+        <div class="card-illustration">
+          <!-- Circular CPLD Resource visualizer -->
+          <svg width="180" height="180" viewBox="0 0 200 200">
+            <circle cx="100" cy="100" r="80" fill="none" stroke="var(--border-color)" stroke-width="12" />
+            <circle cx="100" cy="100" r="80" fill="none" stroke="var(--accent-blue)" stroke-width="12" 
+                    stroke-dasharray="502" stroke-dashoffset="30" stroke-linecap="round" transform="rotate(-90 100 100)"/>
+            <text x="100" y="95" text-anchor="middle" font-family="var(--font-display)" font-size="28" font-weight="700" fill="var(--text-main)">94%</text>
+            <text x="100" y="125" text-anchor="middle" font-size="11" fill="var(--text-sub)" font-weight="600">宏单元占用 (120/128)</text>
+          </svg>
+        </div>
+        <div class="card-footer">
+          <div class="card-price">
+            EPM7128 CPLD
+            <span>宏单元裕量：8 MCs</span>
+          </div>
+          <span class="card-btn">精简架构</span>
+        </div>
+      </div>
+
+      <!-- Card 2: Synchronous sync -->
+      <div class="card">
+        <div>
+          <div class="card-label">全同步架构</div>
+          <h2 class="card-title">精准。告别抖动与乱跳</h2>
+          <p class="card-desc">所有异步按键 (QD, PULSE) 和低频秒时钟 (CP3) 均通过 CP2 采样同步化，摒弃在板级乱跳的异步触发，实现工业级的可靠走时。</p>
+        </div>
+        <div class="card-illustration">
+          <!-- Sync SVG visualization -->
+          <svg width="180" height="180" viewBox="0 0 200 200">
+            <!-- Jittery line top -->
+            <path d="M 20,40 L 40,40 L 43,30 L 48,50 L 53,25 L 60,40 L 100,40" fill="none" stroke="#ff9500" stroke-width="2.5" stroke-linecap="round"/>
+            <text x="35" y="25" fill="#ff9500" font-size="10" font-weight="700">异步输入抖动</text>
+            <!-- Downward Arrow -->
+            <path d="M 100,40 L 100,80" fill="none" stroke="var(--text-sub)" stroke-width="1.5" stroke-dasharray="4,4"/>
+            <rect x="75" y="80" width="50" height="30" rx="6" fill="var(--accent-blue)" />
+            <text x="100" y="99" fill="white" font-size="10" font-weight="700" text-anchor="middle">CP2 同步锁存</text>
+            <!-- Smooth line out -->
+            <path d="M 100,110 L 100,140 L 180,140" fill="none" stroke="var(--accent-green)" stroke-width="3" stroke-linecap="round"/>
+            <text x="130" y="132" fill="var(--accent-green)" font-size="10" font-weight="700">纯净时序输出</text>
+          </svg>
+        </div>
+        <div class="card-footer">
+          <div class="card-price">
+            CP2 (1KHz) 主域
+            <span>无缝物理消抖</span>
+          </div>
+          <span class="card-btn">全同步</span>
+        </div>
+      </div>
+
+      <!-- Card 3: Multi-sensory interactive -->
+      <div class="card">
+        <div>
+          <div class="card-label">多维感知功能</div>
+          <h2 class="card-title">功能完备的时间容器</h2>
+          <p class="card-desc">集成 24 小时计时、HH:MM:SS 全格式闹钟设置与查看、一键 QD 闹钟静音、K4 整点短报时、调时位智能闪烁提示等多维交互体验。</p>
+        </div>
+        <div class="card-illustration">
+          <!-- Features list mockup on a watch face -->
+          <svg width="180" height="180" viewBox="0 0 200 200">
+            <rect x="20" y="20" width="160" height="160" rx="20" fill="var(--bg-color)" stroke="var(--border-color)" stroke-width="2"/>
+            <circle cx="50" cy="55" r="16" fill="rgba(0, 102, 204, 0.1)"/>
+            <text x="50" y="60" text-anchor="middle" font-size="14" fill="var(--accent-blue)">⏰</text>
+            <text x="80" y="59" font-size="12" font-weight="700" fill="var(--text-main)">秒级闹钟匹配</text>
+            
+            <circle cx="50" cy="100" r="16" fill="rgba(52, 199, 89, 0.1)"/>
+            <text x="50" y="105" text-anchor="middle" font-size="14" fill="var(--accent-green)">🔔</text>
+            <text x="80" y="104" font-size="12" font-weight="700" fill="var(--text-main)">整点短鸣报时</text>
+
+            <circle cx="50" cy="145" r="16" fill="rgba(255, 149, 0, 0.1)"/>
+            <text x="50" y="150" text-anchor="middle" font-size="14" fill="#ff9500">✨</text>
+            <text x="80" y="149" font-size="12" font-weight="700" fill="var(--text-main)">当前调时位闪烁</text>
+          </svg>
+        </div>
+        <div class="card-footer">
+          <div class="card-price">
+            三维逻辑状态机
+            <span>安全复用 PIN_52</span>
+          </div>
+          <span class="card-btn">多合一</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- INTERACTIVE SIMULATOR SECTION -->
+    <section class="simulator-container" id="simulator-section">
+      <div class="simulator-title-block">
+        <h2>交互式 CPLD 电子钟模拟器</h2>
+        <p>100% 还原 Verilog 硬件逻辑，体验芯片的时序流转与交互设计</p>
+      </div>
+
+      <div class="sim-layout">
+        <!-- Left: Watch Device Mockup -->
+        <div class="sim-panel-hardware">
+          <div class="virtual-watch">
+            <div class="watch-header">
+              <span>TEC-8 CPLD</span>
+              <div style="display: flex; align-items: center; gap: 4px;">
+                <span id="watch-status-text">运行中</span>
+                <div class="watch-status-dot" id="watch-status-indicator"></div>
+              </div>
+            </div>
+
+            <div class="watch-face">
+              <div class="watch-face-mode" id="watch-mode-label">CLOCK TIME</div>
+              
+              <!-- 6 digits display HH:MM:SS -->
+              <div class="digits-display">
+                <div class="digit-group">
+                  <span class="digit-val" id="d-h1">0</span>
+                  <span class="digit-val" id="d-h0">0</span>
+                </div>
+                <span class="digit-colon" id="d-colon1">:</span>
+                <div class="digit-group">
+                  <span class="digit-val" id="d-m1">0</span>
+                  <span class="digit-val" id="d-m0">0</span>
+                </div>
+                <span class="digit-colon" id="d-colon2">:</span>
+                <div class="digit-group">
+                  <span class="digit-val" id="d-s1">0</span>
+                  <span class="digit-val" id="d-s0">0</span>
+                </div>
+              </div>
+
+              <!-- Speaker Soundwave Indicator -->
+              <div class="speaker-visualizer" id="spk-visualizer">
+                <div class="speaker-bar"></div>
+                <div class="speaker-bar"></div>
+                <div class="speaker-bar"></div>
+                <div class="speaker-bar"></div>
+                <div class="speaker-bar"></div>
+              </div>
+            </div>
+
+            <!-- Indicators for CPLD Settings and Outputs -->
+            <div class="watch-indicators">
+              <div class="indicator-row">
+                <span>闹钟状态 (K3): <strong id="ind-k3">关闭</strong></span>
+                <span>报时开关 (K4): <strong id="ind-k4">开启</strong></span>
+              </div>
+              <div class="indicator-row">
+                <span>时钟源 CP2: <strong>1 KHz</strong></span>
+                <span>秒脉冲 CP3: <strong>1 Hz</strong></span>
+              </div>
+            </div>
+
+            <!-- Crown & Side buttons -->
+            <div class="watch-crown"></div>
+            <div class="watch-side-btn"></div>
+          </div>
+        </div>
+
+        <!-- Right: Digital Breadboard Controls -->
+        <div class="sim-panel-controls">
+          <div>
+            <div class="control-header">
+              <h3>控制输入面板</h3>
+              <p>操作这些拨码开关与脉冲按键，它们直接对应 CPLD 的物理输入管脚</p>
+            </div>
+
+            <!-- Dial Switches K0-K4 -->
+            <div class="control-group">
+              <div class="control-group-title">
+                <span>拨码控制开关 (K0 - K4)</span>
+                <span>Level Inputs</span>
+              </div>
+              <div class="switches-grid">
+                <div class="switch-wrapper" id="sw-k0" onclick="toggleSwitch('k0')">
+                  <div class="switch-info">
+                    <span class="switch-name">时校准选择 (K0)</span>
+                    <span class="switch-desc">K0=1 选中小时字段</span>
+                  </div>
+                  <div class="switch-pill"></div>
+                </div>
+
+                <div class="switch-wrapper" id="sw-k1" onclick="toggleSwitch('k1')">
+                  <div class="switch-info">
+                    <span class="switch-name">分校准选择 (K1)</span>
+                    <span class="switch-desc">K1=1 选中分钟字段</span>
+                  </div>
+                  <div class="switch-pill"></div>
+                </div>
+
+                <div class="switch-wrapper" id="sw-k2" onclick="toggleSwitch('k2')">
+                  <div class="switch-info">
+                    <span class="switch-name">闹钟设置模式 (K2)</span>
+                    <span class="switch-desc">K2=1 查看/校准闹钟</span>
+                  </div>
+                  <div class="switch-pill"></div>
+                </div>
+
+                <div class="switch-wrapper" id="sw-k3" onclick="toggleSwitch('k3')">
+                  <div class="switch-info">
+                    <span class="switch-name">闹钟使能开关 (K3)</span>
+                    <span class="switch-desc">K3=1 开启闹钟判定</span>
+                  </div>
+                  <div class="switch-pill"></div>
+                </div>
+
+                <div class="switch-wrapper active" id="sw-k4" onclick="toggleSwitch('k4')">
+                  <div class="switch-info">
+                    <span class="switch-name">整点报时开关 (K4)</span>
+                    <span class="switch-desc">K4=1 开启整点报时</span>
+                  </div>
+                  <div class="switch-pill"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tactile Buttons: CLR#, QD, PULSE -->
+            <div class="control-group">
+              <div class="control-group-title">
+                <span>脉冲按键 (CLR#, QD, PULSE)</span>
+                <span>Edge / Pulse Inputs</span>
+              </div>
+              <div class="buttons-grid">
+                <button class="btn-tactile" onclick="triggerReset()">CLR# 复位</button>
+                <button class="btn-tactile highlight" onclick="triggerQD()">QD (走/停/消音)</button>
+                <button class="btn-tactile" onclick="triggerPulse()">PULSE 步进</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Speed Controls for simulator test -->
+          <div class="speed-control">
+            <div class="switch-info">
+              <span class="switch-name">时钟加速倍率</span>
+              <span class="switch-desc">加速流逝以便快速测试进位、整点和闹钟匹配</span>
+            </div>
+            <div class="speed-btns">
+              <button class="btn-speed active" onclick="setSpeed(1)">1x</button>
+              <button class="btn-speed" onclick="setSpeed(60)">60x</button>
+              <button class="btn-speed" onclick="setSpeed(1800)">1800x</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DETAILED CODE, SPECS AND SIMULATING WAVEFORMS -->
+    <section class="details-section" id="details-section">
+      <div class="details-tabs">
+        <button class="tab-btn active" onclick="switchTab('specs')">设计约束与架构</button>
+        <button class="tab-btn" onclick="switchTab('code')">Verilog 核心 RTL</button>
+        <button class="tab-btn" onclick="switchTab('wave')">仿真时序波形</button>
+      </div>
+
+      <!-- Tab 1: Specs -->
+      <div class="tab-pane active" id="pane-specs">
+        <div class="specs-grid">
+          <div class="specs-text">
+            <h3>设计要求与硬件配额</h3>
+            <p>本工程面向 <strong>TEC-8 实验箱</strong> 以及 <strong>EPM7128SLC84-15</strong> CPLD 芯片。由于该芯片的逻辑容量极为受限（仅 128 个宏单元），因此对代码设计提出了苛刻的要求。</p>
+            <div class="alert-banner">
+              <div>
+                <div class="alert-banner-title">⚠ 关键硬件物理约束</div>
+                <div class="alert-banner-text">
+                  1. LG1 秒个位驱动必须直译码（LG1-D0..D6，Pin 58..64），LG2..LG6 采用 4-bit BCD 驱动输出。<br>
+                  2. 扬声器驱动与直译码小数点（LG1-D7）复用物理引脚 PIN_52。设计中必须小心处理蜂鸣时钟，不可误点亮数码管。
+                </div>
+              </div>
+            </div>
+            <ul class="specs-list">
+              <li>
+                <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                <span><strong>全同步设计：</strong>使用 1KHz 的 CP2 时钟作为主工作时域，将按键和秒脉冲同步化，杜绝了电路板上的竞争冒险。</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                <span><strong>零多余资源：</strong>将计数寄存器直接定义为六个 BCD 码，避开了复杂的二进制-BCD码译码电路，省下了宝贵的宏单元。</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                <span><strong>防误触逻辑：</strong>闹钟设置状态 K2=1 时，QD 按键被屏蔽，避免调闹钟时误触发系统开始/暂停计时。</span>
+              </li>
+            </ul>
+          </div>
+          <div>
+            <div class="specs-table-wrapper">
+              <h4 style="margin-bottom:14px; font-weight:700;">管脚分配与利用率</h4>
+              <table class="specs-table">
+                <thead>
+                  <tr>
+                    <th>信号/管脚</th>
+                    <th>物理 Pin (EPM7128)</th>
+                    <th>说明</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th>cp2</th>
+                    <td>PIN_83</td>
+                    <td>同步主时钟 (推荐选择 1KHz)</td>
+                  </tr>
+                  <tr>
+                    <th>cp3</th>
+                    <td>PIN_2</td>
+                    <td>计时秒脉冲 (推荐选择 1Hz)</td>
+                  </tr>
+                  <tr>
+                    <th>clr_n</th>
+                    <td>PIN_1</td>
+                    <td>低电平异步总复位</td>
+                  </tr>
+                  <tr>
+                    <th>qd / pulse</th>
+                    <td>PIN_15, PIN_18</td>
+                    <td>运行控制 / 单步校时脉冲</td>
+                  </tr>
+                  <tr>
+                    <th>k0 - k4</th>
+                    <td>PIN_20, 21, 22, 24, 25</td>
+                    <td>拨码功能输入按键</td>
+                  </tr>
+                  <tr>
+                    <th>lg1_d0..d6</th>
+                    <td>PIN_58 - PIN_64</td>
+                    <td>秒个位共阴极数码管直译码</td>
+                  </tr>
+                  <tr>
+                    <th>lg1_d7 (SPK)</th>
+                    <td>PIN_52</td>
+                    <td>扬声器输出 (LG1-D7 共用)</td>
+                  </tr>
+                  <tr>
+                    <th>lg2..lg6</th>
+                    <td>4x5 = 20 个引脚</td>
+                    <td>BCD 码输出 (时分秒十位/个位)</td>
+                  </tr>
+                  <tr style="background: rgba(0, 102, 204, 0.05);">
+                    <th>总宏单元</th>
+                    <td colspan="2"><strong>120 / 128 (93.8%)</strong> — 极高利用率</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 2: Code -->
+      <div class="tab-pane" id="pane-code">
+        <div class="code-viewer-layout">
+          <ul class="code-nav">
+            <li><button class="code-nav-btn active" onclick="setCodeSnippet('top')">模块端口与变量定义</button></li>
+            <li><button class="code-nav-btn" onclick="setCodeSnippet('carry')">时分秒 BCD 进位函数</button></li>
+            <li><button class="code-nav-btn" onclick="setCodeSnippet('main')">核心同步主状态机</button></li>
+            <li><button class="code-nav-btn" onclick="setCodeSnippet('decoder')">数码管译码与输出</button></li>
+          </ul>
+
+          <div class="code-content-wrapper">
+            <div class="code-content-header">
+              <span class="code-filename" id="code-file-label">clock.v &gt; Module Declarations</span>
+              <div class="code-controls">
+                <span class="code-control-dot red"></span>
+                <span class="code-control-dot yellow"></span>
+                <span class="code-control-dot green"></span>
+              </div>
+            </div>
+            <pre class="code-pre-scroll"><code class="code-block" id="code-box-element">Loading...</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 3: Simulation Waveforms -->
+      <div class="tab-pane" id="pane-wave">
+        <h3 class="waveform-title">CPLD 时序仿真验证</h3>
+        <p class="waveform-desc">经由 ModelSim 及 iverilog / vvp 严格验证的时序波形。波形展示了 CP2 (时钟域)、CP3 (秒边沿检测)、QD 启动暂停以及脉冲校时的精确同步关系。</p>
+        
+        <div class="waveform-svg-wrapper">
+          <svg class="waveform-svg" viewBox="0 0 1000 240" xmlns="http://www.w3.org/2000/svg">
+            <!-- Grid Lines -->
+            <line x1="50" y1="10" x2="950" y2="10" stroke="#333" stroke-width="0.5"/>
+            <line x1="50" y1="50" x2="950" y2="50" stroke="#333" stroke-width="0.5"/>
+            <line x1="50" y1="90" x2="950" y2="90" stroke="#333" stroke-width="0.5"/>
+            <line x1="50" y1="130" x2="950" y2="130" stroke="#333" stroke-width="0.5"/>
+            <line x1="50" y1="170" x2="950" y2="170" stroke="#333" stroke-width="0.5"/>
+            <line x1="50" y1="210" x2="950" y2="210" stroke="#333" stroke-width="0.5"/>
+
+            <!-- CP2 (System Clock) -->
+            <text x="10" y="32" fill="#888" font-family="var(--font-mono)" font-size="10">cp2</text>
+            <path d="M 120,35 L 140,35 L 140,20 L 160,20 L 160,35 L 180,35 L 180,20 L 200,20 L 200,35 L 220,35 L 220,20 L 240,20 L 240,35 L 260,35 L 260,20 L 280,20 L 280,35 L 300,35 L 300,20 L 320,20 L 320,35 L 340,35 L 340,20 L 360,20 L 360,35 L 380,35 L 380,20 L 400,20 L 400,35 L 420,35 L 420,20 L 440,20 L 440,35 L 460,35 L 460,20 L 480,20 L 480,35 L 500,35 L 500,20 L 520,20 L 520,35 L 540,35 L 540,20 L 560,20 L 560,35 L 580,35 L 580,20 L 600,20 L 600,35 L 620,35 L 620,20 L 640,20 L 640,35 L 660,35 L 660,20 L 680,20 L 680,35 L 700,35 L 700,20 L 720,20 L 720,35 L 740,35 L 740,20 L 760,20 L 760,35 L 780,35 L 780,20 L 800,20 L 800,35 L 820,35 L 820,20 L 840,20 L 840,35 L 860,35" fill="none" stroke="#2997ff" stroke-width="1.5"/>
+
+            <!-- CP3 (1Hz Sec Tick Input) -->
+            <text x="10" y="72" fill="#888" font-family="var(--font-mono)" font-size="10">cp3</text>
+            <path d="M 120,75 L 300,75 L 300,60 L 580,60 L 580,75 L 860,75" fill="none" stroke="#5ac8fa" stroke-width="1.5"/>
+
+            <!-- CP3 Sync registers -->
+            <text x="10" y="112" fill="#888" font-family="var(--font-mono)" font-size="10">cp3_sync[2:1]</text>
+            <path d="M 120,115 L 320,115 L 320,100 L 600,100 L 600,115 L 860,115" fill="none" stroke="#ffcc00" stroke-width="1.5"/>
+            <text x="325" y="96" fill="#ffcc00" font-size="9" font-family="var(--font-mono)">锁存延迟 1个CP2周期</text>
+
+            <!-- cp3_rise (Edge trigger) -->
+            <text x="10" y="152" fill="#888" font-family="var(--font-mono)" font-size="10">cp3_rise</text>
+            <path d="M 120,155 L 320,155 L 320,140 L 340,140 L 340,155 L 600,155 L 600,140 L 620,140 L 620,155 L 860,155" fill="none" stroke="#34c759" stroke-width="2"/>
+            <text x="345" y="150" fill="#34c759" font-size="9" font-family="var(--font-mono)">秒计时触发脉冲</text>
+
+            <!-- clock digits counter update -->
+            <text x="10" y="192" fill="#888" font-family="var(--font-mono)" font-size="10">digits (BCD)</text>
+            <!-- Hex blocks -->
+            <path d="M 120,195 L 320,195 L 320,180 L 325,195 L 600,195 L 600,180 L 605,195 L 860,195" fill="none" stroke="#ff3b30" stroke-dasharray="none" stroke-width="1.5"/>
+            <text x="200" y="191" fill="#fff" font-size="10" font-family="var(--font-mono)">23:59:58</text>
+            <text x="440" y="191" fill="#fff" font-size="10" font-family="var(--font-mono)">23:59:59</text>
+            <text x="700" y="191" fill="#fff" font-size="10" font-family="var(--font-mono)">00:00:00 (溢出归零)</text>
+          </svg>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- VIEW 2: FULL SLIDESHOW VIEW (PPT PRESENTATION MODE) -->
+  <div id="slideshow-view">
+    <div class="slide-deck">
+      <div class="slides-container">
+        
+        <!-- Slide 1: Cover -->
+        <div class="slide active" id="slide-0">
+          <div class="slide-center-layout">
+            <span class="slide-tag">汇报演示 PPT</span>
+            <h1 class="slide-title" style="font-size: 60px; margin-bottom: 20px;">重新定义时间</h1>
+            <p style="font-size: 24px; color: var(--text-sub); margin-bottom: 40px;">基于 Verilog 电子钟的同步设计与 CPLD 实现</p>
+            <div style="font-size: 14px; color: var(--text-sub); line-height: 1.6;">
+              报告人：项目工程组<br>
+              目标载体：TEC-8 实验系统 + EPM7128SLC84 CPLD
+            </div>
+          </div>
+        </div>
+
+        <!-- Slide 2: Design Philosophy -->
+        <div class="slide" id="slide-1">
+          <div class="slide-title-area">
+            <span class="slide-tag">设计哲学</span>
+            <h2 class="slide-title">极简。精准。少即是多。</h2>
+          </div>
+          <div class="slide-content-grid">
+            <div class="slide-text-pane">
+              <p>让逻辑在微秒之间优雅闭环。不仅满足基础走时，更精细雕琢可靠性。</p>
+              <ul>
+                <li><strong>24小时制精确走时：</strong>内部秒级状态无缝进位。</li>
+                <li><strong>物理消抖防回弹：</strong>彻底杜绝机械开关产生的毛刺。</li>
+                <li><strong>调时闪烁提示：</strong>人机界面交互对齐现代数码产品体验。</li>
+              </ul>
+            </div>
+            <div class="slide-media-pane">
+              <div class="slide-card" style="width: 100%; text-align: center;">
+                <h3 style="font-size: 40px; margin-bottom: 10px; font-family: var(--font-display); color: var(--accent-blue)">1 KHz</h3>
+                <p style="color: var(--text-sub); font-size: 14px;">CP2 主同步工作频率，每 1ms 重新评估所有输入脚状态，进行数字锁存。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Slide 3: Hardware Budget Constraint -->
+        <div class="slide" id="slide-2">
+          <div class="slide-title-area">
+            <span class="slide-tag">平台物理配额</span>
+            <h2 class="slide-title">戴着镣铐跳舞</h2>
+          </div>
+          <div class="slide-content-grid">
+            <div class="slide-text-pane">
+              <p>EPM7128SLC84 的宏单元资源非常紧缺。任何多余的逻辑都将导致综合器无法布线：</p>
+              <ul style="margin-top: 10px;">
+                <li><strong>当前使用度：</strong>120 / 128 个宏单元 (占比达 93.8%)。</li>
+                <li><strong>仅剩空间：</strong>8个宏单元，后续功能扩展需极度小心。</li>
+                <li><strong>优化手段：</strong>全系统使用 BCD 寄存器，规避昂贵的二进制-十进制译码逻辑，释放布线压力。</li>
+              </ul>
+            </div>
+            <div class="slide-media-pane" style="flex-direction: column; gap: 20px;">
+              <div style="background: rgba(255, 149, 0, 0.1); border-left: 4px solid #ff9500; padding: 15px; border-radius: 8px; font-size: 13px; color: var(--text-main); width: 100%;">
+                <strong>避雷忠告：</strong>切勿在此 CPLD 设备上盲目引入倒计时、反向校时或者长按加速逻辑，否则编译器会因宏单元溢出而报错！
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Slide 4: System Architecture -->
+        <div class="slide" id="slide-3">
+          <div class="slide-title-area">
+            <span class="slide-tag">系统架构</span>
+            <h2 class="slide-title">心跳与逻辑分布</h2>
+          </div>
+          <div class="slide-content-grid">
+            <div class="slide-text-pane">
+              <p>为了让整个系统足够精简，我们仅部署两个外部时钟域，极大地降低了电磁干扰：</p>
+              <ul>
+                <li><strong>CP2 时钟 (1KHz)：</strong>主逻辑同步与按键滤波。扬声器在此翻转得到 ~500Hz 蜂鸣音色。</li>
+                <li><strong>CP3 脉冲 (1Hz)：</strong>走时基准脉冲。在同步电路中作为使能标志而非直接作为触发器时钟。</li>
+                <li><strong>PIN_52 双重化：</strong>扬声器与 LG1 数码管共用引脚，设计中引入软件静默隔离。</li>
+              </ul>
+            </div>
+            <div class="slide-media-pane">
+              <div class="slide-code-box">
+                <span class="c-kw">wire</span> cp3_rise = (cp3_sync[2:1] == 2'b01);<br>
+                <span class="c-kw">wire</span> qd_rise = (qd_sync[2:1] == 2'b01);<br><br>
+                <span class="c-cm">// 仅使用一个时钟边沿更新全局状态</span><br>
+                <span class="c-kw">always</span> @(<span class="c-kw">posedge</span> cp2) <span class="c-kw">begin</span><br>
+                &nbsp;&nbsp;cp3_sync &lt;= {cp3_sync[1:0], cp3};<br>
+                &nbsp;&nbsp;qd_sync &lt;= {qd_sync[1:0], qd};<br>
+                <span class="c-kw">end</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Slide 5: Asymmetric and Synchronous analysis -->
+        <div class="slide" id="slide-4">
+          <div class="slide-title-area">
+            <span class="slide-tag">时序优化</span>
+            <h2 class="slide-title">告别异步乱跳</h2>
+          </div>
+          <div class="slide-content-grid">
+            <div class="slide-text-pane">
+              <p>第一代版本采用 `posedge cp3` 和 `posedge pulse` 的多时钟触发器。这引发了严重的硬件毛刺：</p>
+              <ul>
+                <li><strong>痛点：</strong>直接使用机械开关脉冲驱动计数器时钟，会导致极严重的接触抖动，使数码管数字乱跳。</li>
+                <li><strong>方案：</strong>本版本全部修正为 CP2 主时钟同步采样。CP3 及 Pulse 仅作为判断条件。</li>
+                <li><strong>收益：</strong>波序平直干净，数码管无任何乱闪，成功编译通过 Quartus 时序验证。</li>
+              </ul>
+            </div>
+            <div class="slide-media-pane">
+              <!-- Visual grid representing synch lock -->
+              <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; text-align: center; width: 100%">
+                <span style="font-size: 14px; font-weight: 700; display: block; margin-bottom: 12px;">同步时序仿真波形图</span>
+                <div class="sim-waveform-box">
+                  [CP3上升沿 ───&gt; 锁存1毫秒 ───&gt; 执行加1]
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Slide 6: Alarm Details -->
+        <div class="slide" id="slide-5">
+          <div class="slide-title-area">
+            <span class="slide-tag">功能扩展</span>
+            <h2 class="slide-title">多功能闹钟与整点报时</h2>
+          </div>
+          <div class="slide-content-grid">
+            <div class="slide-text-pane">
+              <p>高利用率并不影响功能的丰富性。时钟集成了完整的声响反馈系统：</p>
+              <ul>
+                <li><strong>HH:MM:SS 秒级闹钟：</strong>可调节到具体某秒。到点后以 1Hz 频率滴答短响，支持任意时刻按 QD 消音。</li>
+                <li><strong>整点短报时：</strong>K4 开启后，在运行进入整点瞬间短鸣 125ms，校时过程中不报时，防止噪音。</li>
+                <li><strong>安全互斥：</strong>K2 在调闹钟时屏蔽 QD，避免误改变主时钟的走停状态。</li>
+              </ul>
+            </div>
+            <div class="slide-media-pane">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; width: 100%;">
+                <div style="background: rgba(52, 199, 89, 0.08); padding: 20px; border-radius: 16px; border: 1px solid rgba(52,199,89,0.2)">
+                  <h4 style="color: var(--accent-green); margin-bottom: 8px;">K3 闹钟控制</h4>
+                  <p style="font-size: 12px; color: var(--text-sub)">独立锁存闹钟，按 QD 进行消音时不会停止当前时间的计时运行。</p>
+                </div>
+                <div style="background: rgba(41, 151, 255, 0.08); padding: 20px; border-radius: 16px; border: 1px solid rgba(41,151,255,0.2)">
+                  <h4 style="color: var(--accent-blue); margin-bottom: 8px;">K4 整点控制</h4>
+                  <p style="font-size: 12px; color: var(--text-sub)">检测低16位分和秒是否为全 0，触发 125ms 的快速时钟中断短鸣。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Slide 7: Simulated Sandbox -->
+        <div class="slide" id="slide-6">
+          <div class="slide-title-area">
+            <span class="slide-tag">交互演示</span>
+            <h2 class="slide-title">数字芯片交互模拟</h2>
+          </div>
+          <div class="slide-content-grid">
+            <div class="slide-text-pane">
+              <p>我们可以在右侧运行本系统的核心仿真控制，验证 CPLD 在按键事件下的响应表现。</p>
+              <p style="font-size: 14px; color: var(--text-sub);">拨动 K2 可以进入闹钟查看/修改，在暂停状态下使用 PULSE 模拟单步调试按钮。</p>
+              <div style="background: var(--card-bg); border: 1px solid var(--border-color); padding: 12px 18px; border-radius: 8px; font-size: 12px;">
+                提示：这并非网页JS的时钟代码，而是基于电路板逻辑仿真的寄存器机。
+              </div>
+            </div>
+            <div class="slide-media-pane">
+              <div style="background: var(--text-main); color: var(--bg-color); padding: 20px; border-radius: 16px; width: 100%; text-align: center;">
+                <h4 style="margin-bottom: 10px;">点击下方链接返回首页体验完整模拟器</h4>
+                <a href="#simulator-section" onclick="setViewMode('product')" class="btn-primary" style="display:inline-block; margin-top:10px;">前往模拟器</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Slide 8: Code Structure -->
+        <div class="slide" id="slide-7">
+          <div class="slide-title-area">
+            <span class="slide-tag">核心Verilog实现</span>
+            <h2 class="slide-title">极简函数与结构设计</h2>
+          </div>
+          <div class="slide-content-grid">
+            <div class="slide-text-pane">
+              <p>为了重用加法器并最大限度压缩生成的乘积项，我们将小时/分钟进位独立写成复用函数：</p>
+              <ul>
+                <li><strong>inc_hour_pair：</strong>执行 24 小时翻转以及十位/个位十进制加法。</li>
+                <li><strong>inc_minute_pair：</strong>执行 60 分钟翻转并自动级联小时增量。</li>
+                <li><strong>seg7_cc：</strong>秒个位共阴极数码管纯组合逻辑译码，消除内部多余分配器。</li>
+              </ul>
+            </div>
+            <div class="slide-media-pane">
+              <div class="slide-code-box" style="font-size: 11px;">
+                <span class="c-kw">function</span> [7:0] inc_hour_pair;<br>
+                &nbsp;&nbsp;<span class="c-kw">input</span> [7:0] current;<br>
+                &nbsp;&nbsp;<span class="c-kw">begin</span><br>
+                &nbsp;&nbsp;&nbsp;&nbsp;h_tens = current[7:4]; h_ones = current[3:0];<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="c-kw">if</span> (h_tens == 4'd2 &amp;&amp; h_ones == 4'd3) <span class="c-kw">begin</span><br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;inc_hour_pair = 8'h00;<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="c-kw">end</span> <span class="c-kw">else</span> ...<br>
+                &nbsp;&nbsp;<span class="c-kw">end</span><br>
+                <span class="c-kw">endfunction</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Slide 9: Summary & Future -->
+        <div class="slide" id="slide-8">
+          <div class="slide-center-layout">
+            <span class="slide-tag">项目总结与展望</span>
+            <h2 class="slide-title" style="margin-bottom: 24px;">让每一次跳动，都充满意义</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; text-align: left; margin-bottom: 40px;">
+              <div class="slide-card">
+                <h4 style="font-weight: 700; margin-bottom: 8px;">后续优化方向</h4>
+                <p style="font-size: 13px; color: var(--text-sub); line-height: 1.4;">合并常规走时与闹钟走时在加法计算路径上的进位分支，进一步将宏单元占用从 120 降低至 112 左右。</p>
+              </div>
+              <div class="slide-card">
+                <h4 style="font-weight: 700; margin-bottom: 8px;">外设与硬件扩展</h4>
+                <p style="font-size: 13px; color: var(--text-sub); line-height: 1.4;">通过 I2C 总线挂载独立的 RTC 时钟芯片，将计时可靠性移交给外部石英晶振，并可利用剩下的 IO 接口扩充液晶屏幕显示。</p>
+              </div>
+            </div>
+            <p style="font-size: 20px; font-weight: 700;">谢谢您的观看</p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Slides Bottom Navigation Bar -->
+      <div class="slide-controls-bar">
+        <div class="slide-page-num" id="slide-page-indicator">第 1 页 / 共 9 页</div>
+        
+        <div class="slide-progress-dots" id="slide-dots-container">
+          <!-- Dots dynamically created -->
+        </div>
+
+        <div class="slide-nav-btns">
+          <button class="btn-slide-nav" onclick="prevSlide()">←</button>
+          <button class="btn-slide-nav" onclick="nextSlide()">→</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footers -->
+  <footer class="footer">
+    <div class="footer-content">
+      <div class="footer-logo">
+        <svg width="24" height="24" viewBox="0 0 24 24">
+          <rect x="5" y="2" width="14" height="20" rx="4" fill="none" stroke="currentColor" stroke-width="2"/>
+          <circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+        TEC-8 Verilog 电子钟项目
+      </div>
+      <ul class="footer-links">
+        <li><a href="#product-view" onclick="setViewMode('product')">项目首页</a></li>
+        <li><a href="#simulator-section">物理模拟</a></li>
+        <li><a href="#details-section">硬件指标</a></li>
+        <li><a href="#" onclick="toggleViewMode(); return false;">演示 PPT</a></li>
+      </ul>
+      <p class="footer-copyright">
+        本页面专为演示 CPLD 电子钟所设计，采用 Apple 极简网页设计风格。<br>
+        © 2026 项目开发工程组. 保留所有逻辑设计权利。
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    // ----------------------------------------------------
+    // RTL CODE SNIPPETS DICTIONARY FOR CODE VIEWER
+    // ----------------------------------------------------
+    const CODE_SNIPPETS = {
+      top: `module clock(
+    input  wire cp2,      // 同步时钟信号 (1KHz)
+    input  wire cp3,      // 秒计时基准 (1Hz)
+    input  wire clr_n,    // 低电平异步清零复位
+    input  wire qd,       // 运行暂停切换 / 闹钟消音按键
+    input  wire pulse,    // 单步调整按键
+    input  wire k0,       // 校时字段选中：小时
+    input  wire k1,       // 校时字段选中：分钟
+    input  wire k2,       // 闹钟查看与校准模式
+    input  wire k3,       // 闹钟功能使能开关
+    input  wire k4,       // 整点报时功能开关
+    output wire lg1_d0, lg1_d1, lg1_d2, lg1_d3, lg1_d4, lg1_d5, lg1_d6,
+    output wire lg1_d7,   // 扬声器驱动 (Pin 52)
+    output wire lg2_a, lg2_b, lg2_c, lg2_d, // 秒十位 BCD 输出
+    output wire lg3_a, lg3_b, lg3_c, lg3_d, // 分个位 BCD 输出
+    output wire lg4_a, lg4_b, lg4_c, lg4_d, // 分十位 BCD 输出
+    output wire lg5_a, lg5_b, lg5_c, lg5_d, // 时个位 BCD 输出
+    output wire lg6_a, lg6_b, lg6_c, lg6_d  // 时十位 BCD 输出
+);
+    parameter [6:0] BEEP_TICKS = 7'd125; // 扬声器短鸣周期
+
+    reg        run_enable;
+    reg        alarm_active;
+    reg        alarm_check_pending;
+    reg [6:0]  beep_ticks;
+    reg        blink_phase;
+    reg [23:0] digits;       // 当前时间 BCD 码寄存器 {时十位,时个位,分十位,分个位,秒十位,秒个位}
+    reg [23:0] alarm_digits; // 闹钟时间 BCD 码寄存器
+    
+    // 同步采样移位寄存器
+    reg [2:0]  cp3_sync;
+    reg [2:0]  qd_sync;
+    reg [2:0]  pulse_sync;`,
+
+      carry: `    // 24小时制加 1 辅助函数
+    function [7:0] inc_hour_pair;
+        input [7:0] current;
+        reg [3:0] h_tens;
+        reg [3:0] h_ones;
+        begin
+            h_tens = current[7:4];
+            h_ones = current[3:0];
+            if (h_tens == 4'd2) begin
+                if (h_ones == 4'd3) begin
+                    h_tens = 4'd0;
+                    h_ones = 4'd0;
+                end else h_ones = h_ones + 4'd1;
+            end else if (h_ones == 4'd9) begin
+                h_ones = 4'd0;
+                h_tens = h_tens + 4'd1;
+            end else h_ones = h_ones + 4'd1;
+            inc_hour_pair = {h_tens, h_ones};
+        end
+    endfunction
+
+    // 60分钟加 1 并级联小时函数
+    function [15:0] inc_minute_pair;
+        input [15:0] current;
+        reg [3:0] h_tens, h_ones, m_tens, m_ones;
+        reg [7:0] next_hour;
+        begin
+            h_tens = current[15:12]; h_ones = current[11:8];
+            m_tens = current[7:4];   m_ones = current[3:0];
+            if ((m_tens == 4'd5) && (m_ones == 4'd9)) begin
+                m_tens = 4'd0; m_ones = 4'd0;
+                next_hour = inc_hour_pair({h_tens, h_ones});
+                h_tens = next_hour[7:4]; h_ones = next_hour[3:0];
+            end else if (m_ones == 4'd9) begin
+                m_ones = 4'd0; m_tens = m_tens + 4'd1;
+            end else m_ones = m_ones + 4'd1;
+            inc_minute_pair = {h_tens, h_ones, m_tens, m_ones};
+        end
+    endfunction`,
+
+      main: `    // 核心时序同步逻辑
+    always @(negedge clr_n or posedge cp2) begin
+        if (!clr_n) begin
+            run_enable   <= 1'b1;
+            alarm_active <= 1'b0;
+            digits       <= 24'h000000;
+            alarm_digits <= 24'h000000;
+            beep_ticks   <= 7'd0;
+        end else begin
+            // 输入同步化
+            cp3_sync   <= {cp3_sync[1:0], cp3};
+            qd_sync    <= {qd_sync[1:0], qd};
+            pulse_sync <= {pulse_sync[1:0], pulse};
+            
+            // 闹钟警报状态判定
+            if (alarm_start || alarm_second_beep || hourly_chime_start)
+                beep_ticks <= BEEP_TICKS;
+            else if (beep_running)
+                beep_ticks <= beep_ticks - 7'd1;
+
+            // QD 边沿检测：暂停或闹钟消音
+            if (qd_rise && qd_control_allowed) begin
+                if (alarm_active) alarm_active <= 1'b0;
+                else              run_enable   <= ~run_enable;
+            end
+
+            // 走时自增或脉冲校时
+            if (run_enable) begin
+                if (cp3_rise) begin
+                    digits <= digits_next_tick;
+                    alarm_check_pending <= 1'b1;
+                end
+            end else if (!alarm_active && pulse_rise) begin
+                if (show_alarm) begin // 校准闹钟时间
+                    if (k0_level)      alarm_digits <= inc_alarm_hour(alarm_digits);
+                    else if (k1_level) alarm_digits <= inc_alarm_minute(alarm_digits);
+                    else               alarm_digits <= inc_alarm_second(alarm_digits);
+                end else begin // 校准普通时间
+                    if (k0_level)      digits <= inc_hour(digits);
+                    else if (k1_level) digits <= inc_minute(digits);
+                    else               digits <= inc_second(digits);
+                end
+            end
+        end
+    end`,
+
+      decoder: `    // 共阴极七段译码器函数
+    function [6:0] seg7_cc;
+        input [3:0] bcd;
+        begin
+            case (bcd)
+                4'd0: seg7_cc = 7'b0111111;
+                4'd1: seg7_cc = 7'b0000110;
+                4'd2: seg7_cc = 7'b1011011;
+                4'd3: seg7_cc = 7'b1001111;
+                4'd4: seg7_cc = 7'b1100110;
+                4'd5: seg7_cc = 7'b1101101;
+                4'd6: seg7_cc = 7'b1111101;
+                4'd7: seg7_cc = 7'b0000111;
+                4'd8: seg7_cc = 7'b1111111;
+                4'd9: seg7_cc = 7'b1101111;
+                default: seg7_cc = 7'b0000000;
+            endcase
+        end
+    endfunction
+
+    // 调时状态闪烁：如果 blink_phase 为 1，则对应数码管熄灭
+    wire blank_hour = adj_hour && blink_phase;
+    wire blank_min  = adj_min  && blink_phase;
+    wire blank_sec  = adj_sec  && blink_phase;
+
+    // 输出赋值
+    assign lg1_d0 = lg1_segments[0];
+    assign lg1_d1 = lg1_segments[1];
+    assign lg1_d2 = lg1_segments[2];
+    assign lg1_d3 = lg1_segments[3];
+    assign lg1_d4 = lg1_segments[4];
+    assign lg1_d5 = lg1_segments[5];
+    assign lg1_d6 = lg1_segments[6];
+    assign lg1_d7 = speaker_out; // Pin 52 驱动扬声器蜂鸣`
+    };
+
+    function highlightVerilog(code) {
+      // Basic syntax highlighter for presentation view
+      return code
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/(\/\/.*)/g, '<span class="c-cm">$1</span>') // Comments
+        .replace(/\b(module|endmodule|input|output|wire|reg|parameter|always|begin|end|if|else|case|default|endcase|function|endfunction|assign)\b/g, '<span class="c-kw">$1</span>') // Keywords
+        .replace(/\b(\d+'[bdh][0-9a-fA-F_]+|\b\d+\b)\b/g, '<span class="c-num">$1</span>') // Numbers
+        .replace(/`timescale.*/g, '<span class="c-cm">$&</span>');
+    }
+
+    function setCodeSnippet(key) {
+      document.querySelectorAll('.code-nav-btn').forEach(btn => btn.classList.remove('active'));
+      const activeBtn = Array.from(document.querySelectorAll('.code-nav-btn')).find(btn => btn.getAttribute('onclick').includes(key));
+      if (activeBtn) activeBtn.classList.add('active');
+
+      const label = document.getElementById('code-file-label');
+      const box = document.getElementById('code-box-element');
+      
+      const labels = {
+        top: 'clock.v > 端口与寄存器声明',
+        carry: 'clock.v > 级联进位与计数逻辑',
+        main: 'clock.v > 同步移位锁存核心控制',
+        decoder: 'clock.v > 动态闪烁与数码管译码'
+      };
+
+      label.innerText = labels[key];
+      box.innerHTML = highlightVerilog(CODE_SNIPPETS[key]);
+    }
+
+
+    // ----------------------------------------------------
+    // SYSTEM DARK MODE SWITCH
+    // ----------------------------------------------------
+    let isDarkMode = false;
+    function toggleDarkMode() {
+      isDarkMode = !isDarkMode;
+      document.body.classList.toggle('dark-mode', isDarkMode);
+      document.getElementById('theme-btn').innerText = isDarkMode ? '浅色模式' : '深色模式';
+    }
+
+
+    // ----------------------------------------------------
+    // VIEW MODE SWITCHER (PRODUCT vs SLIDESHOW)
+    // ----------------------------------------------------
+    let currentView = 'product'; // 'product' or 'slides'
+    function toggleViewMode() {
+      setViewMode(currentView === 'product' ? 'slides' : 'product');
+    }
+
+    function setViewMode(mode) {
+      currentView = mode;
+      const pView = document.getElementById('product-view');
+      const sView = document.getElementById('slideshow-view');
+      const modeBtn = document.getElementById('view-mode-btn');
+
+      if (mode === 'product') {
+        pView.style.display = 'block';
+        sView.style.display = 'none';
+        modeBtn.innerText = '演示 PPT 模式';
+        document.body.style.overflowY = 'auto'; // allow scrolling
+      } else {
+        pView.style.display = 'none';
+        sView.style.display = 'block';
+        modeBtn.innerText = '退出 PPT 模式';
+        document.body.style.overflowY = 'hidden'; // freeze viewport scroll
+        updateSlideDisplay();
+      }
+    }
+
+
+    // ----------------------------------------------------
+    // TAB PANE SWITCHER
+    // ----------------------------------------------------
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.getAttribute('onclick').includes(tabId)) btn.classList.add('active');
+      });
+
+      document.querySelectorAll('.tab-pane').forEach(pane => {
+        pane.classList.remove('active');
+      });
+      document.getElementById('pane-' + tabId).classList.add('active');
+    }
+
+
+    // ----------------------------------------------------
+    // PPT SLIDE DECK LOGIC
+    // ----------------------------------------------------
+    let activeSlideIndex = 0;
+    const totalSlides = 9;
+
+    function initSlides() {
+      const dotsContainer = document.getElementById('slide-dots-container');
+      dotsContainer.innerHTML = '';
+      for (let i = 0; i < totalSlides; i++) {
+        const dot = document.createElement('div');
+        dot.className = `slide-dot ${i === 0 ? 'active' : ''}`;
+        dot.onclick = () => goToSlide(i);
+        dotsContainer.appendChild(dot);
+      }
+    }
+
+    function goToSlide(index) {
+      if (index < 0 || index >= totalSlides) return;
+      
+      const prevActive = activeSlideIndex;
+      activeSlideIndex = index;
+
+      document.querySelectorAll('.slide').forEach((s, idx) => {
+        s.classList.remove('active', 'prev-slide');
+        if (idx === activeSlideIndex) {
+          s.classList.add('active');
+        } else if (idx < activeSlideIndex) {
+          s.classList.add('prev-slide');
+        }
+      });
+
+      // Update dots
+      document.querySelectorAll('.slide-dot').forEach((d, idx) => {
+        d.classList.toggle('active', idx === activeSlideIndex);
+      });
+
+      // Update label
+      document.getElementById('slide-page-indicator').innerText = `第 ${activeSlideIndex + 1} 页 / 共 ${totalSlides} 页`;
+    }
+
+    function nextSlide() {
+      if (activeSlideIndex < totalSlides - 1) {
+        goToSlide(activeSlideIndex + 1);
+      }
+    }
+
+    function prevSlide() {
+      if (activeSlideIndex > 0) {
+        goToSlide(activeSlideIndex - 1);
+      }
+    }
+
+    // Keyboard controls in Slideshow Mode
+    window.addEventListener('keydown', (e) => {
+      if (currentView === 'slides') {
+        if (e.key === 'ArrowRight' || e.key === ' ') {
+          nextSlide();
+        } else if (e.key === 'ArrowLeft') {
+          prevSlide();
+        } else if (e.key === 'Escape') {
+          setViewMode('product');
+        }
+      }
+    });
+
+    function updateSlideDisplay() {
+      goToSlide(activeSlideIndex);
+    }
+
+
+    // ----------------------------------------------------
+    // INTERACTIVE CPLD CLOCK ENGINE (JS EMULATOR)
+    // ----------------------------------------------------
+    // State Registers
+    let digits = { h1:0, h0:0, m1:0, m0:0, s1:0, s0:0 };
+    let alarmDigits = { h1:0, h0:0, m1:0, m0:0, s1:0, s0:0 };
+    
+    let runEnable = true;
+    let alarmActive = false;
+    let alarmCheckPending = false;
+    let blinkPhase = false;
+
+    // Switches
+    let sw_k0 = false;
+    let sw_k1 = false;
+    let sw_k2 = false; // alarm setting view
+    let sw_k3 = false; // alarm enable
+    let sw_k4 = true;  // hourly chime
+
+    let simSpeed = 1;
+    let simIntervalId = null;
+    let blinkIntervalId = null;
+
+    // Sound Context
+    let audioCtx = null;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+    }
+
+    function playBeep(durationMs = 125, frequencyHz = 520) {
+      try {
+        initAudio();
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        osc.type = 'square'; // matching flip-flop tone
+        osc.frequency.setValueAtTime(frequencyHz, audioCtx.currentTime);
+        
+        gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime); // keep it soft
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + durationMs / 1000);
+
+        osc.start();
+        osc.stop(audioCtx.currentTime + durationMs / 1000);
+      } catch (err) {
+        console.warn('Audio play failed: ', err);
+      }
+    }
+
+    function toggleSwitch(key) {
+      if (key === 'k0') { sw_k0 = !sw_k0; if (sw_k0) { sw_k1 = false; document.getElementById('sw-k1').classList.remove('active'); } }
+      if (key === 'k1') { sw_k1 = !sw_k1; if (sw_k1) { sw_k0 = false; document.getElementById('sw-k0').classList.remove('active'); } }
+      if (key === 'k2') { sw_k2 = !sw_k2; }
+      if (key === 'k3') { 
+        sw_k3 = !sw_k3; 
+        document.getElementById('ind-k3').innerText = sw_k3 ? '开启' : '关闭';
+        if (!sw_k3) {
+          alarmActive = false;
+        }
+      }
+      if (key === 'k4') {
+        sw_k4 = !sw_k4;
+        document.getElementById('ind-k4').innerText = sw_k4 ? '开启' : '关闭';
+      }
+
+      document.getElementById(`sw-${key}`).classList.toggle('active', eval(`sw_${key}`));
+      updateDisplayValues();
+    }
+
+    function triggerReset() {
+      playBeep(80, 200); // low reset sound
+      digits = { h1:0, h0:0, m1:0, m0:0, s1:0, s0:0 };
+      alarmDigits = { h1:0, h0:0, m1:0, m0:0, s1:0, s0:0 };
+      runEnable = true;
+      alarmActive = false;
+      updateDisplayValues();
+    }
+
+    function triggerQD() {
+      playBeep(40, 600);
+      if (alarmActive) {
+        // Dismiss alarm
+        alarmActive = false;
+      } else {
+        // Toggle run/pause if not checking alarm set
+        if (!sw_k2) {
+          runEnable = !runEnable;
+        }
+      }
+      updateDisplayValues();
+    }
+
+    // Single pulse adjustment increment functions
+    function incrementHour(targetObj) {
+      let hr = targetObj.h1 * 10 + targetObj.h0;
+      hr = (hr + 1) % 24;
+      targetObj.h1 = Math.floor(hr / 10);
+      targetObj.h0 = hr % 10;
+    }
+
+    function incrementMinute(targetObj) {
+      let mn = targetObj.m1 * 10 + targetObj.m0;
+      mn = (mn + 1) % 60;
+      targetObj.m1 = Math.floor(mn / 10);
+      targetObj.m0 = mn % 10;
+    }
+
+    function incrementSecond(targetObj) {
+      let sc = targetObj.s1 * 10 + targetObj.s0;
+      sc = (sc + 1) % 60;
+      targetObj.s1 = Math.floor(sc / 10);
+      targetObj.s0 = sc % 10;
+    }
+
+    function triggerPulse() {
+      // Manual adjustment when paused
+      if (!runEnable && !alarmActive) {
+        playBeep(50, 800);
+        let target = sw_k2 ? alarmDigits : digits;
+        if (sw_k0) {
+          incrementHour(target);
+        } else if (sw_k1) {
+          incrementMinute(target);
+        } else {
+          incrementSecond(target);
+        }
+      }
+      updateDisplayValues();
+    }
+
+    // Step clock time forward (CP3 second edge trigger simulator)
+    function clockStep() {
+      if (!runEnable) return;
+
+      // Increment clock digits by 1 second
+      let sc = digits.s1 * 10 + digits.s0;
+      let mn = digits.m1 * 10 + digits.m0;
+      let hr = digits.h1 * 10 + digits.h0;
+
+      sc++;
+      if (sc >= 60) {
+        sc = 0;
+        mn++;
+        if (mn >= 60) {
+          mn = 0;
+          hr = (hr + 1) % 24;
+
+          // HOURLY CHIME TRIGGER (when clock strikes XX:00:00)
+          if (sw_k4 && !sw_k2) {
+            playBeep(125, 1000); // 1KHz short beep
+          }
+        }
+      }
+
+      digits.s1 = Math.floor(sc / 10);
+      digits.s0 = sc % 10;
+      digits.m1 = Math.floor(mn / 10);
+      digits.m0 = mn % 10;
+      digits.h1 = Math.floor(hr / 10);
+      digits.h0 = hr % 10;
+
+      // ALARM判定 CHECK
+      if (sw_k3 && !alarmActive) {
+        const timeMatch = (digits.h1 === alarmDigits.h1 && digits.h0 === alarmDigits.h0 &&
+                           digits.m1 === alarmDigits.m1 && digits.m0 === alarmDigits.m0 &&
+                           digits.s1 === alarmDigits.s1 && digits.s0 === alarmDigits.s0);
+        if (timeMatch) {
+          alarmActive = true;
+        }
+      }
+
+      if (alarmActive) {
+        // Sound ring tone once per second tick
+        playBeep(125, 520);
+      }
+
+      updateDisplayValues();
+    }
+
+    function setSpeed(speed) {
+      simSpeed = speed;
+      document.querySelectorAll('.btn-speed').forEach(btn => {
+        btn.classList.toggle('active', btn.innerText.includes(speed + 'x'));
+      });
+      restartSimInterval();
+    }
+
+    function restartSimInterval() {
+      if (simIntervalId) clearInterval(simIntervalId);
+      // at 1x: 1000ms. at 60x: 16.6ms. at 1800x: 0.55ms.
+      const intervalMs = Math.max(1, Math.round(1000 / simSpeed));
+      simIntervalId = setInterval(clockStep, intervalMs);
+    }
+
+    // Blink digits when calibrating
+    function runBlinkController() {
+      blinkIntervalId = setInterval(() => {
+        blinkPhase = !blinkPhase;
+        updateDisplayValues();
+      }, 350);
+    }
+
+    function updateDisplayValues() {
+      const activeSet = sw_k2 ? alarmDigits : digits;
+      const label = document.getElementById('watch-mode-label');
+      label.innerText = sw_k2 ? 'ALARM SET' : 'CLOCK TIME';
+
+      // Set digital elements
+      const el_h1 = document.getElementById('d-h1');
+      const el_h0 = document.getElementById('d-h0');
+      const el_m1 = document.getElementById('d-m1');
+      const el_m0 = document.getElementById('d-m0');
+      const el_s1 = document.getElementById('d-s1');
+      const el_s0 = document.getElementById('d-s0');
+
+      el_h1.innerText = activeSet.h1;
+      el_h0.innerText = activeSet.h0;
+      el_m1.innerText = activeSet.m1;
+      el_m0.innerText = activeSet.m0;
+      el_s1.innerText = activeSet.s1;
+      el_s0.innerText = activeSet.s0;
+
+      // Handle blink phase if paused
+      const blinkHour = !runEnable && sw_k0 && blinkPhase;
+      const blinkMin  = !runEnable && sw_k1 && blinkPhase;
+      const blinkSec  = !runEnable && !sw_k0 && !sw_k1 && blinkPhase;
+
+      el_h1.classList.toggle('blink-off', blinkHour);
+      el_h0.classList.toggle('blink-off', blinkHour);
+      el_m1.classList.toggle('blink-off', blinkMin);
+      el_m0.classList.toggle('blink-off', blinkMin);
+      el_s1.classList.toggle('blink-off', blinkSec);
+      el_s0.classList.toggle('blink-off', blinkSec);
+
+      // Colons flash during normal running clock mode
+      const colonBlink = runEnable && !alarmActive && !sw_k2;
+      document.getElementById('d-colon1').classList.toggle('frozen', !colonBlink);
+      document.getElementById('d-colon2').classList.toggle('frozen', !colonBlink);
+
+      // Status indicator LED
+      const dot = document.getElementById('watch-status-indicator');
+      const statusText = document.getElementById('watch-status-text');
+      
+      dot.className = 'watch-status-dot';
+      if (alarmActive) {
+        dot.classList.add('alarm-sounding');
+        statusText.innerText = '警报拉响';
+      } else if (!runEnable) {
+        dot.classList.add('paused');
+        statusText.innerText = '已暂停';
+      } else {
+        statusText.innerText = '运行中';
+      }
+
+      // Speaker sound waves
+      const spkVis = document.getElementById('spk-visualizer');
+      spkVis.classList.toggle('active', alarmActive || (sw_k4 && digits.s1===0 && digits.s0===0 && digits.m1===0 && digits.m0===0 && runEnable && !sw_k2));
+    }
+
+
+    // ----------------------------------------------------
+    // INITIALIZATION
+    // ----------------------------------------------------
+    window.onload = function() {
+      // 1. Load initial code snippet
+      setCodeSnippet('top');
+      
+      // 2. Setup Slides dot indicator controls
+      initSlides();
+
+      // 3. Launch Simulated clock core loop
+      restartSimInterval();
+      runBlinkController();
+      updateDisplayValues();
+    };
+  </script>
+</body>
+</html>
