@@ -11,6 +11,7 @@ module tb_clock;
     reg k1;
     reg k2;
     reg k3;
+    reg k4;
 
     wire lg1_d0;
     wire lg1_d1;
@@ -61,6 +62,7 @@ module tb_clock;
         .k1(k1),
         .k2(k2),
         .k3(k3),
+        .k4(k4),
         .lg1_d0(lg1_d0),
         .lg1_d1(lg1_d1),
         .lg1_d2(lg1_d2),
@@ -407,6 +409,7 @@ module tb_clock;
         k1 = 1'b0;
         k2 = 1'b0;
         k3 = 1'b0;
+        k4 = 1'b0;
 
         #2 clr_n = 1'b0;
         #8 clr_n = 1'b1;
@@ -663,6 +666,9 @@ module tb_clock;
 
         cp3_tick;
         check_digits(24'h010202, "clock must keep running with alarm disabled");
+
+        k4 = 1'b1;
+        wait_sync;
 
         dut.digits = 24'h015958;
         wait_sync;
