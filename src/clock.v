@@ -10,6 +10,7 @@ module clock(
     input  wire k1,
     input  wire k2,
     input  wire k3,
+    input  wire k4,
     output wire lg1_d0,
     output wire lg1_d1,
     output wire lg1_d2,
@@ -61,6 +62,7 @@ module clock(
 
     wire show_alarm = k2_sync;
     wire alarm_enable = k3_sync;
+    wire hourly_chime_enable = k4;
     wire [23:0] shown_digits = show_alarm ? alarm_digits : digits;
 
     wire adj_active = !run_enable && !alarm_active;
@@ -97,7 +99,7 @@ module clock(
     wire alarm_start = alarm_enable && !alarm_active && alarm_check_pending && alarm_time_matches;
     wire alarm_dismiss = alarm_active && qd_rise && qd_control_allowed;
     wire alarm_second_beep = alarm_active && cp3_rise;
-    wire hourly_chime_start = alarm_check_pending && (digits[15:0] == 16'h0000);
+    wire hourly_chime_start = hourly_chime_enable && alarm_check_pending && (digits[15:0] == 16'h0000);
     wire beep_running = (beep_ticks != 7'd0);
     wire speaker_out = beep_running ? beep_ticks[0] : 1'b0;
 
