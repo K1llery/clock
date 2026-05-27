@@ -85,7 +85,8 @@ These constraints come from page 22 of `实验五+六-预习.pdf` and should be 
   - `CP2` on pin `57`: selectable `1KHz / 100Hz`, used for synchronization and alarm tone generation
   - `CP3` on pin `58`: selectable `10Hz / 1Hz`, use `1Hz` for one-second alarm beep spacing
 - Board control pulses / reset:
-  - `CLR#` on pin `1`: low-active reset signal; this RTL consumes it as `clr_n`
+  - `K5` on pin `76`: switch input used by this RTL as the reset source; each sampled level change resets the clock to `00:00:00`
+  - `CLR#` on pin `1`: board reset signal, not consumed by this RTL
   - `QD` on pin `60`: single-pulse control input
   - `Pulse` / `PULSE` on pin `61`: interrupt/manual pulse input
 - Switches: the board has 16 switch inputs `K15..K0`

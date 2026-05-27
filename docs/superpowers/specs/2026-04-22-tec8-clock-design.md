@@ -9,7 +9,7 @@ Implement a resource-conscious electronic clock with a single alarm feature for 
 - `LG1` is the lowest digit and must be driven directly through `LG1-D0..D6`.
 - `LG2..LG6` expose 4-bit BCD outputs (`A` = LSB, `D` = MSB).
 - The seven-segment display is common cathode, so direct segment outputs are active high.
-- Required control signals are `CLR#`, `QD`, and `PULSE`.
+- Required control signals are `K5`, `QD`, and `PULSE`; `K5` level changes reset the clock.
 - From `实验五+六-预习.pdf`, `MF=1MHz`, `CP1=100KHz/10KHz`, `CP2=1KHz/100Hz`, and `CP3=10Hz/1Hz`.
 - Approved interaction:
   - `QD` toggles run/pause.
@@ -28,7 +28,7 @@ Implement a resource-conscious electronic clock with a single alarm feature for 
 - Store time directly as six BCD digits to avoid binary-to-BCD conversion logic.
 - Store alarm time directly as six BCD digits (`HHMMSS`) so the alarm can trigger at an exact second without binary-to-BCD conversion.
 - Use `CP2` as the single synchronous clock domain for the design.
-- Synchronize `CP3`, `QD`, `PULSE`, and `K0..K3` into the `CP2` domain.
+- Synchronize `CP3`, `QD`, `PULSE`, and `K0..K4` into the `CP2` domain; compare `K5` with its `CP2`-sampled previous value for reset-change detection.
 - Treat `CP3` as a synchronized second-tick source and the alarm beep cadence source.
 - Reuse `CP2` for the alarm speaker tone so the RTL no longer consumes the `CP1` input.
 - Recommended bench setup:
@@ -36,7 +36,7 @@ Implement a resource-conscious electronic clock with a single alarm feature for 
   - `CP3` set to `1Hz` so alarm beeps are spaced by about one second
   - `CP1` left unused
 - Keep the control path minimal:
-  - asynchronous clear on `CLR#`
+  - `K5` resets time/alarm state whenever its sampled level changes
   - `QD` toggles a single `run_enable` bit
   - `PULSE` updates hours, minutes, or seconds only when paused and no alarm is actively sounding
 - Manual hour and minute adjustment preserves the current seconds field. Manual second adjustment is available when neither `K0` nor `K1` is selected.
@@ -58,7 +58,7 @@ Implement a resource-conscious electronic clock with a single alarm feature for 
 - Latest baseline fit: `120 / 128 macrocells` and `42 / 68 pins`.
 - The design is capacity-limited rather than speed-limited; `CP2` timing margin is much larger than the recommended `1KHz` board clock.
 - Future RTL features should first reduce or share existing logic. A target of `124 / 128 macrocells` or less leaves a small practical repair margin.
-- Known risky additions on this device: bidirectional setting through `K5`, countdown mode, multiple alarms, long-press auto-repeat, and complex speaker patterns.
+- Known risky additions on this device: countdown mode, multiple alarms, long-press auto-repeat, complex speaker patterns, or repurposing `K5` away from reset without first freeing resources.
 - Better near-term work: reduce duplicated BCD increment logic, make setting/update paths share more hardware, shorten the beep counter if acceptable, and strengthen testbench/documentation coverage.
 
 ## Root Cause Notes

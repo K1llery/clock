@@ -50,7 +50,7 @@ set_global_assignment -name VERILOG_FILE src/clock.v
 
 set_location_assignment PIN_57 -to cp2
 set_location_assignment PIN_58 -to cp3
-set_location_assignment PIN_1 -to clr_n
+set_location_assignment PIN_76 -to k5
 set_location_assignment PIN_60 -to qd
 set_location_assignment PIN_61 -to pulse
 set_location_assignment PIN_54 -to k0

@@ -1686,14 +1686,14 @@
               </div>
             </div>
 
-            <!-- Tactile Buttons: CLR#, QD, PULSE -->
+            <!-- Tactile Buttons: K5, QD, PULSE -->
             <div class="control-group">
               <div class="control-group-title">
-                <span>脉冲按键 (CLR#, QD, PULSE)</span>
+                <span>脉冲按键 / 复位 (K5, QD, PULSE)</span>
                 <span>Edge / Pulse Inputs</span>
               </div>
               <div class="buttons-grid">
-                <button class="btn-tactile" onclick="triggerReset()">CLR# 复位</button>
+                <button class="btn-tactile" onclick="triggerReset()">K5 翻转复位</button>
                 <button class="btn-tactile highlight" onclick="triggerQD()">QD (走/停/消音)</button>
                 <button class="btn-tactile" onclick="triggerPulse()">PULSE 步进</button>
               </div>
@@ -1777,9 +1777,9 @@
                     <td>计时秒脉冲 (推荐选择 1Hz)</td>
                   </tr>
                   <tr>
-                    <th>clr_n</th>
-                    <td>PIN_1</td>
-                    <td>低电平异步总复位</td>
+                    <th>k5</th>
+                    <td>PIN_76</td>
+                    <td>高低电平变化复位</td>
                   </tr>
                   <tr>
                     <th>qd / pulse</th>
@@ -2160,7 +2160,7 @@
       top: `module clock(
     input  wire cp2,      // 同步时钟信号 (1KHz)
     input  wire cp3,      // 秒计时基准 (1Hz)
-    input  wire clr_n,    // 低电平异步清零复位
+    input  wire k5,       // 高低电平变化复位
     input  wire qd,       // 运行暂停切换 / 闹钟消音按键
     input  wire pulse,    // 单步调整按键
     input  wire k0,       // 校时字段选中：小时
@@ -2232,19 +2232,19 @@
     endfunction`,
 
       main: `    // 核心时序同步逻辑
-    always @(negedge clr_n or posedge cp2) begin
-        if (!clr_n) begin
+    always @(posedge cp2) begin
+        k5_prev   <= k5;
+        cp3_sync  <= {cp3_sync[1:0], cp3};
+        qd_sync   <= {qd_sync[1:0], qd};
+        pulse_sync<= {pulse_sync[1:0], pulse};
+
+        if (k5 ^ k5_prev) begin
             run_enable   <= 1'b1;
             alarm_active <= 1'b0;
             digits       <= 24'h000000;
             alarm_digits <= 24'h000000;
             beep_ticks   <= 7'd0;
         end else begin
-            // 输入同步化
-            cp3_sync   <= {cp3_sync[1:0], cp3};
-            qd_sync    <= {qd_sync[1:0], qd};
-            pulse_sync <= {pulse_sync[1:0], pulse};
-            
             // 闹钟警报状态判定
             if (alarm_start || alarm_second_beep || hourly_chime_start)
                 beep_ticks <= BEEP_TICKS;

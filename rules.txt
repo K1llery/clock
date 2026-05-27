@@ -1,0 +1,92 @@
+Verilog工程应用技巧与规范
+29
+1.代码规范与可读性
+使用清晰的命名规则：模块、信号、变量要有意义。
+使用注释：特别是状态机、关键信号和复杂逻辑，增加代码可读性。
+避免使用 assign连续赋值进行大规模组合逻辑，推荐always @(*) 来描述组合逻辑。
+reg [7:0] data = 8'hFF; // initial 语句在综合中无效
+2. 严格使用可综合语句
+仅使用“always/assign/if/case”等可综合语句； 避免“initial/fork￾join/time/force-release等仿真专用语句； 禁止在RTL代码中使用`#`延时（仅用于测
+试激励）；不要使用循环语句。
+always @(posedge clk or negedge reset_n) begin
+if (!reset_n)
+data <= 8'hFF; // 通过复位进行初始化
+end
+Verilog工程应用技巧与规范
+30
+3.时序设计
+所有寄存器时钟同步；
+仅使用一个全局时钟（如 clk）驱动寄存器，
+避免异步时钟域问题；
+复位策略尽量使用异步复位同步释放；
+采用非阻塞赋值 (<=) 更新寄存器；
+always @(posedge clk or negedge
+reset_n) begin
+if (!reset_n)
+count <= 0;
+else
+count <= count + 1;
+end
+always @(*) begin
+case (sel)
+2'b00: out = in0;
+2'b01: out = in1;
+2'b10: out = in2;
+2'b11: out = in3;
+default: out = 0; // 避免 latch
+endcase
+end
+4 .组合逻辑设计
+确保所有组合逻辑都有完整的赋值，防止综
+合工具产生锁存器latch
+Verilog工程应用技巧与规范
+5.阻塞与非阻塞
+阻塞赋值：语句按顺序执行，适用于组合逻辑建模。
+非阻塞赋值：语句并行执行，适用于时序逻辑建模。
+避免在同一个 always 块中混用阻塞和非阻塞赋值，以防止产生不可预期的行为。
+6.建模选择
+初学推荐行为级建模（模块+过程块描述）；熟练可使用数据流建模（连续赋值语
+句assign+运算符）；初学阶段慎用系统级建模（层级模块调用）
+31
+Verilog工程应用技巧与规范
+32
+7.合理使用有限状态机（FSM）
+使用 case 语句避免复杂 if-else 结构。
+parameter IDLE = 2'b00, READ = 2'b01, WRITE = 2'b10;
+reg [1:0] state;
+always @(posedge clk or negedge reset_n) begin
+if (!reset_n)
+state <= IDLE;
+else begin
+case (state)
+IDLE: if (start) state <= READ;
+READ: if (done) state <= WRITE;
+WRITE: if (finish) state <= IDLE;
+default: state <= IDLE;
+endcase
+end
+end
+8.信号类型与操作符
+建议仅用reg、wire型
+数制尽量采用二进制
+不做除法与取模运算
+Verilog工程应用技巧与规范
+33
+9.常见错误规避
+错误类型 解决方案
+锁存器生成 确保组合逻辑完全条件判断
+多时钟域冲突 严格同步处理跨时钟域信号
+仿真-综合不一
+致
+避免在RTL中使用不可综合
+结构
+不定态传播 设置默认复位值，避免X态传
+播
+10.优化策略（资源与速度的权衡）
+ 关键路径速度优化：
+- 复杂组合逻辑拆分为流水线结构
+- 优先级编码改用case语句
+ 面积（资源）优化：
+- 资源共享（时分复用）
+- 状态机合并冗余状态
+

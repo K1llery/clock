@@ -4,7 +4,7 @@ module tb_clock;
 
     reg cp2;
     reg cp3;
-    reg clr_n;
+    reg k5;
     reg qd;
     reg pulse;
     reg k0;
@@ -55,7 +55,7 @@ module tb_clock;
     clock dut (
         .cp2(cp2),
         .cp3(cp3),
-        .clr_n(clr_n),
+        .k5(k5),
         .qd(qd),
         .pulse(pulse),
         .k0(k0),
@@ -116,6 +116,13 @@ module tb_clock;
             #9 pulse = 1'b1;
             #12 pulse = 1'b0;
             #9;
+        end
+    endtask
+
+    task k5_reset;
+        begin
+            k5 = ~k5;
+            wait_cp2_cycles(5);
         end
     endtask
 
@@ -402,7 +409,7 @@ module tb_clock;
     initial begin
         cp2 = 1'b0;
         cp3 = 1'b0;
-        clr_n = 1'b1;
+        k5 = 1'b0;
         qd = 1'b0;
         pulse = 1'b0;
         k0 = 1'b0;
@@ -411,11 +418,10 @@ module tb_clock;
         k3 = 1'b0;
         k4 = 1'b0;
 
-        #2 clr_n = 1'b0;
-        #8 clr_n = 1'b1;
         wait_sync;
+        k5_reset;
 
-        check_digits(24'h000000, "reset");
+        check_digits(24'h000000, "k5 rising change reset");
         check_alarm_digits(16'h0000, "alarm reset");
         if (dut.run_enable !== 1'b1) begin
             $display("FAIL run_enable should default to running");
@@ -441,9 +447,14 @@ module tb_clock;
         check_digits(24'h000100, "seconds roll to next minute after 59");
         check_visible_seconds(4'd0, 4'd0, "visible seconds reset only after 59");
 
-        #2 clr_n = 1'b0;
-        #8 clr_n = 1'b1;
+        k5_reset;
         wait_sync;
+
+        check_digits(24'h000000, "k5 falling change reset");
+        if (dut.run_enable !== 1'b1) begin
+            $display("FAIL K5 falling reset should restore running state");
+            $finish;
+        end
 
         cp3_tick;
         cp3_tick;
@@ -458,11 +469,30 @@ module tb_clock;
             $finish;
         end
 
+        qd = 1'b1;
+        wait_cp2_cycles(10);
+        qd = 1'b0;
+        wait_sync;
+        if (dut.run_enable !== 1'b1) begin
+            $display("FAIL held qd should toggle run state only once");
+            $finish;
+        end
+
+        qd_pulse;
+        wait_sync;
+        if (dut.run_enable !== 1'b0) begin
+            $display("FAIL second qd pulse should pause the clock again");
+            $finish;
+        end
+
         cp3_tick;
         check_digits(24'h000003, "paused clock must ignore cp3");
 
-        pulse_btn;
-        check_digits(24'h000004, "second adjust");
+        pulse = 1'b1;
+        wait_cp2_cycles(10);
+        pulse = 1'b0;
+        wait_sync;
+        check_digits(24'h000004, "held pulse should adjust once");
         check_visible_seconds(4'd0, 4'd4, "second adjust visible seconds");
 
         check_blink_lg1(expected_seg7(4'd4), 1'b1, "sec adjust lg1 blink");
@@ -499,7 +529,36 @@ module tb_clock;
         check_blink_bcd_lg(4'd1, 3'd3, 1'b1, "hour adjust lg5 blink");
         check_blink_bcd_lg(4'd0, 3'd4, 1'b1, "hour adjust lg6 blink");
 
+        k1 = 1'b1;
+        pulse_btn;
+        check_digits(24'h020104, "k0 k1 hour priority");
+        check_blink_bcd_lg(4'd2, 3'd3, 1'b1, "k0 k1 lg5 blink");
+        check_blink_bcd_lg(4'd0, 3'd4, 1'b1, "k0 k1 lg6 blink");
+        check_blink_bcd_lg(4'd1, 3'd1, 1'b0, "k0 k1 min no blink");
+
         k0 = 1'b0;
+        k1 = 1'b0;
+        dut.digits = 24'h000059;
+        wait_sync;
+        pulse_btn;
+        check_digits(24'h000100, "manual second carry");
+
+        k1 = 1'b1;
+        dut.digits = 24'h005904;
+        wait_sync;
+        pulse_btn;
+        check_digits(24'h010004, "manual minute carry");
+
+        k1 = 1'b0;
+        k0 = 1'b1;
+        dut.digits = 24'h230104;
+        wait_sync;
+        pulse_btn;
+        check_digits(24'h000104, "manual hour rollover");
+
+        k0 = 1'b0;
+        dut.digits = 24'h010104;
+        wait_sync;
 
         k2 = 1'b1;
         wait_sync;
@@ -522,6 +581,28 @@ module tb_clock;
         check_blink_lg1(expected_seg7(4'd1), 1'b1, "alarm mode sec adjust lg1 blink");
         check_blink_bcd_lg(4'd0, 3'd0, 1'b1, "alarm mode sec adjust lg2 blink");
         check_blink_bcd_lg(4'd1, 3'd3, 1'b0, "alarm mode sec adjust lg5 no blink");
+
+        dut.alarm_digits = 24'h000059;
+        wait_sync;
+        pulse_btn;
+        check_alarm_digits(24'h000100, "alarm manual second carry");
+
+        k1 = 1'b1;
+        dut.alarm_digits = 24'h005901;
+        wait_sync;
+        pulse_btn;
+        check_alarm_digits(24'h010001, "alarm manual minute carry");
+
+        k1 = 1'b0;
+        k0 = 1'b1;
+        dut.alarm_digits = 24'h230001;
+        wait_sync;
+        pulse_btn;
+        check_alarm_digits(24'h000001, "alarm manual hour rollover");
+
+        k0 = 1'b0;
+        dut.alarm_digits = 24'h010201;
+        wait_sync;
 
         qd_pulse;
         wait_sync;
@@ -667,13 +748,33 @@ module tb_clock;
         cp3_tick;
         check_digits(24'h010202, "clock must keep running with alarm disabled");
 
-        k4 = 1'b1;
+        k4 = 1'b0;
         wait_sync;
-
         dut.digits = 24'h015958;
         wait_sync;
         cp3_tick;
-        check_digits(24'h015959, "hourly chime pre-state");
+        check_digits(24'h015959, "hourly chime disabled pre-state");
+        cp3_tick;
+        check_digits(24'h020000, "hourly chime disabled exact hour");
+        sample_speaker_for_cp2_cycles(60);
+        if (speaker_transition_count !== 0) begin
+            $display("FAIL K4 low should keep hourly chime silent transitions=%0d",
+                speaker_transition_count);
+            $finish;
+        end
+        k4 = 1'b1;
+        wait_sync;
+        sample_speaker_for_cp2_cycles(20);
+        if (speaker_transition_count !== 0) begin
+            $display("FAIL enabling K4 after the hour should not backfill a chime transitions=%0d",
+                speaker_transition_count);
+            $finish;
+        end
+
+        dut.digits = 24'h025958;
+        wait_sync;
+        cp3_tick;
+        check_digits(24'h025959, "hourly chime pre-state");
         sample_speaker_for_cp2_cycles(60);
         if (speaker_transition_count !== 0) begin
             $display("FAIL hourly chime should stay silent before the exact hour transitions=%0d",
@@ -682,7 +783,7 @@ module tb_clock;
         end
 
         cp3_tick;
-        check_digits(24'h020000, "hourly chime trigger time");
+        check_digits(24'h030000, "hourly chime trigger time");
         sample_speaker_for_cp2_cycles(60);
         if (!saw_speaker_low || !saw_speaker_high) begin
             $display("FAIL hourly chime should start a short CP2-derived beep at HH:00:00");
