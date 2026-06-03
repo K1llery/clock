@@ -108,6 +108,7 @@
 - 顶层 RTL：[src/clock.v](/D:/clock/src/clock.v)
 - 测试台：[sim/tb_clock.v](/D:/clock/sim/tb_clock.v)
 - 设计说明：[docs/superpowers/specs/2026-04-22-tec8-clock-design.md](/D:/clock/docs/superpowers/specs/2026-04-22-tec8-clock-design.md)
+- 工程流程图：[docs/project-flow.md](/D:/clock/docs/project-flow.md)
 
 ## 验证命令
 
