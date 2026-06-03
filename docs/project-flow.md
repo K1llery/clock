@@ -2,7 +2,7 @@
 
 下面的 Mermaid 图概括了本工程从外部输入到显示、蜂鸣输出的主要数据流和控制流。
 
-如果粘贴到 Mermaid Live Editor 或其他在线渲染器，只复制代码块内部内容，也可以直接使用纯 Mermaid 文件：[project-flow.mmd](/D:/clock/docs/project-flow.mmd)。
+如果粘贴到 Mermaid Live Editor 或其他在线渲染器，只复制代码块内部内容，不要复制 Markdown 标题、说明文字和代码围栏。
 
 ```mermaid
 flowchart TD
